@@ -1,51 +1,27 @@
-
 import
   algorithm, eth_utils, cytoolz, trie.constants
 
-iterator decodeFromBin*(inputBin: cstring): int =
+proc decodeFromBin*(inputBin: string): string =
   ##     0100000101010111010000110100100101001001 -> ASCII
+  newString(result)
   for chunk in partitionAll(8, inputBin):
-    yield sum()                ## py2nim can't generate code for
-              ## GeneratorExp:
-              ##   BinOp:
-              ##     BinOp:
-              ##       Int(2)
-              ##       Pow:
-              ## 
-              ##       Label(exp)
-              ##     Mult:
-              ## 
-              ##     Label(bit)
-              ##   Sequence:
-              ##     comprehension:
-              ##       Tuple:
-              ##         Label(exp)
-              ##         Label(bit)
-              ##       Call:
-              ##         Label(enumerate)
-              ##         Sequence:
-              ##           Call:
-              ##             Label(reversed)
-              ##             Sequence:
-              ##               Label(chunk)
-              ##             Sequence:
-              ## 
-              ##         Sequence:
-              ## 
-              ##       Sequence:
-              ## 
-              ##       Int(0)
-  
-iterator encodeToBin*(value: cstring): bool =
+    var sum = 0
+    for exp, bit in reverse(chunk):
+      sum += 2^exp * bit
+
+    result.add(sum)
+ 
+proc encodeToBin*(value: string): seq[Byte] =
   ##     ASCII -> 0100000101010111010000110100100101001001
-  for char in value:
+  newSeq(result)
+  for c in value:
     for exp in EXP:
-      if nil:
-        yield true
+      if c and exp:
+        result.add('1')
       else:
-        yield False
+        result.add('0')
   
-proc encodeFromBinKeypath*(inputBin: cstring): cstring =
+proc encodeFromBinKeypath*(inputBin: string): string =
   ##     Encodes a sequence of 0s and 1s into tightly packed bytes
   ##     Used in encoding key path of a KV-NODE
   var paddedBin = nil
@@ -55,7 +31,7 @@ proc encodeFromBinKeypath*(inputBin: cstring): cstring =
   else:
     return decodeFromBin(PREFIX100000 + prefix + paddedBin)
   
-proc decodeToBinKeypath*(path: cstring): cstring =
+proc decodeToBinKeypath*(path: string): string =
   ##     Decodes bytes into a sequence of 0s and 1s
   ##     Used in decoding key path of a KV-NODE
   path = encodeToBin(path)

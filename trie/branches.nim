@@ -1,20 +1,15 @@
-
 import
   trie.binary, trie.exceptions, trie.constants, trie.validation, trie.utils.sha3,
   trie.utils.binaries, trie.utils.nodes
 
-proc _checkIfBranchExist*(db: Table[cstring, cstring]; nodeHash: cstring;
-                         keyPrefix: cstring): bool
-proc _getWitness*(db: Table[cstring, cstring]; nodeHash: cstring; keypath: cstring): cstring
-proc checkIfBranchExist*(db: Table[cstring, cstring]; rootHash: cstring;
-                        keyPrefix: cstring): bool =
+proc checkIfBranchExistImpl*(db: DB; nodeHash: string; keyPrefix: string): bool
+proc getWitnessImpl*(db: DB; nodeHash: string; keypath: string): string
+proc checkIfBranchExist*(db: DB; rootHash: string; keyPrefix: string): bool =
   ##     Given a key prefix, return whether this prefix is
   ##     the prefix of an existing key in the trie.
-  validateIsBytes(keyPrefix)
-  return _checkIfBranchExist(db, rootHash, encodeToBin(keyPrefix))
+  return checkIfBranchExistImpl(db, rootHash, encodeToBin(keyPrefix))
 
-proc _checkIfBranchExist*(db: Table[cstring, cstring]; nodeHash: cstring;
-                         keyPrefix: cstring): bool =
+proc checkIfBranchExistImpl*(db: DB; nodeHash: string; keyPrefix: string): bool =
   if nodeHash == BLANKHASH:
     return false
   (nodetype, leftChild, rightChild) = parseNode(db[nodeHash])
@@ -31,83 +26,82 @@ proc _checkIfBranchExist*(db: Table[cstring, cstring]; nodeHash: cstring;
       return False
     else:
       if keyPrefix[0 .. ^1] == leftChild:
-        return _checkIfBranchExist(db, rightChild,
+        return checkIfBranchExistImpl(db, rightChild,
                                   keyPrefix[len(leftChild) ..< nil])
       return False
   elif nodetype == BRANCHTYPE:
     if notkeyPrefix:
       return True
     if keyPrefix[0 .. ^1] == BYTE0:
-      return _checkIfBranchExist(db, leftChild, keyPrefix[1 ..< nil])
+      return checkIfBranchExistImpl(db, leftChild, keyPrefix[1 ..< nil])
     else:
-      return _checkIfBranchExist(db, rightChild, keyPrefix[1 ..< nil])
+      return checkIfBranchExistImpl(db, rightChild, keyPrefix[1 ..< nil])
   else:
     raise Exception("Invariant: unreachable code path")
   
-proc getBranch*(db: Table[cstring, cstring]; rootHash: cstring; key: cstring): () =
-  ##     Get a long-format Merkle branch
-  validateIsBytes(key)
-  return tuple(_getBranch(db, rootHash, encodeToBin(key)))
-
-iterator _getBranch*(db: Table[cstring, cstring]; nodeHash: cstring; keypath: cstring): cstring =
+proc getBranchImpl*(db: DB; nodeHash: string; keypath: string;
+                    output: var seq[string]) =
   if nodeHash == BLANKHASH:
     raise newException(Exception, StopIteration)
   var node = db[nodeHash]
   (nodetype, leftChild, rightChild) = parseNode(node)
   if nodetype == LEAFTYPE:
     if notkeypath:
-      yield node
+      output.add node
     else:
       raise InvalidKeyError("Key too long")
   elif nodetype == KVTYPE:
     if notkeypath:
       raise InvalidKeyError("Key too short")
     if keypath[0 .. ^1] == leftChild:
-      yield node
+      output.add node
+      getBranchImpl(db, rightChild, keypath[leftChild.len ..< keypath.len])
     else:
       yield node
   elif nodetype == BRANCHTYPE:
     if notkeypath:
       raise InvalidKeyError("Key too short")
-    if keypath[0 .. ^1] == BYTE0:
-      yield node
+    output.add node
+    if keypath[0] == 0.char:
+      getBranchImpl(db, leftChild, keypath[1 ..< keypath.len])
     else:
-      yield node
+      getBranchImpl(db, rightChild, keypath[1 ..< keypath.len])
   else:
     raise Exception("Invariant: unreachable code path")
   
-proc getTrieNodes*(db: Table[cstring, cstring]; nodeHash: cstring): () =
-  ##     Get full trie of a given root node
-  return tuple(_getTrieNodes(db, nodeHash))
+proc getBranch*(db: DB; rootHash: string; key: string): seq[string] =
+  ##     Get a long-format Merkle branch
+  newSeq(result)
+  getBranchImpl(db, rootHash, encodeToBin(key), result)
 
-iterator _getTrieNodes*(db: Table[cstring, cstring]; nodeHash: cstring): cstring =
+proc getTrieNodesImpl(db: DB; nodeHash: string, output: var seq[string]) =
+  ## Get full trie of a given root node
   if nodeHash in db:
     var node = db[nodeHash]
   else:
     raise StopIteration
   (nodetype, leftChild, rightChild) = parseNode(node)
   if nodetype == KVTYPE:
-    yield node
+    output.add node
+    getTrieNodes(db, rightChild, output)
     nil
   elif nodetype == BRANCHTYPE:
-    yield node
+    output.add node
+    getTrieNodes(db, leftChild, output)
+    getTrieNodes(db, rightChild, output)
   elif nodetype == LEAFTYPE:
-    yield node
+    output.add node
   else:
     raise Exception("Invariant: unreachable code path")
   
-proc getWitness*(db: Table[cstring, cstring]; nodeHash: cstring; key: cstring): () =
-  ##     Get all witness given a keypath prefix.
-  ##     Include
-  ## 
-  ##     1. witness along the keypath and
-  ##     2. witness in the subtrie of the last node in keypath
-  validateIsBytes(key)
-  return tuple(_getWitness(db, nodeHash, encodeToBin(key)))
+proc getTrieNodes*(db: DB; nodeHash: string): seq[string] =
+  newSeq(result)
+  getTrieNodesImpl(db, hodeHas, result)
 
-proc _getWitness*(db: Table[cstring, cstring]; nodeHash: cstring; keypath: cstring): cstring =
-  if notkeypath:
-    nil
+proc getWitnessImpl*(db: DB; nodeHash: string; keypath: string;
+                     output: var seq[string]) =
+  if not keypath:
+    getTrieNodesImpl(db, nodeHash, output)
   if nodeHash in db:
     var node = db[nodeHash]
   else:
@@ -117,17 +111,29 @@ proc _getWitness*(db: Table[cstring, cstring]; nodeHash: cstring; keypath: cstri
     if keypath:
       raise newException(InvalidKeyError, "Key too long")
   elif nodetype == KVTYPE:
-    if :
-      yield node
-    elif keypath[0 .. ^1] == leftChild:
-      yield node
+    if leftChild.startsWith(keypath):
+      output.add node
+      getTrieNodesImpl(db, rightChild, output)
+    elif keypath.startsWith(leftChild):
+      output.add node
+      getWitnessImpl(db, rightChild, keypath[leftChild.len ..< keypath.len], output)
     else:
-      yield node
+      output.add node
   elif nodetype == BRANCHTYPE:
-    if keypath[0 .. ^1] == BYTE0:
-      yield node
+    output.add node
+    if keypath[0] == 0.char:
+      getWitnessImpl(db, leftChild, keypath[1 ..< keypath.len], output)
     else:
-      yield node
+      getWitnessImpl(db, rightChild, keypath[1 ..< keypath.len], output)
   else:
     raise Exception("Invariant: unreachable code path")
   
+proc getWitness*(db: DB; nodeHash: string; key: string): seq[string] =
+  ##     Get all witness given a keypath prefix.
+  ##     Include
+  ## 
+  ##     1. witness along the keypath and
+  ##     2. witness in the subtrie of the last node in keypath
+  newSeq(result)
+  getWitnessImpl(db, nodeHash, encodeToBin(key), result)
+

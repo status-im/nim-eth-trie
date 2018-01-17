@@ -2,7 +2,7 @@
 import
   codecs, itertools, eth_utils, trie.constants, trie.exceptions
 
-proc bytesToNibbles*(value: cstring): seq[int] =
+proc bytesToNibbles*(value: string): seq[int] =
   ##     Convert a byte string to nibbles
   return tuple()               ## py2nim can't generate code for
                ## GeneratorExp:
@@ -33,7 +33,7 @@ iterator pairwise*(iterable: (int, int, int, int, int, int, int, int)): (int, in
   for left, right in zip(nil):
     yield (left, right)
 
-proc nibblesToBytes*(nibbles: (int, int, int, int, int, int, int, int)): cstring =
+proc nibblesToBytes*(nibbles: (int, int, int, int, int, int, int, int)): string =
   if any():                    ## py2nim can't generate code for
           ## GeneratorExp:
           ##   BoolOp:
@@ -64,7 +64,7 @@ proc nibblesToBytes*(nibbles: (int, int, int, int, int, int, int, int)): cstring
     raise newException(InvalidNibbles, "Nibbles contained invalid value.  Must be constrained between [0, 15]")
   if nil:
     raise newException(InvalidNibbles, "Nibbles must be even in length")
-  var value = cstring(nil)
+  var value = string(nil)
   return value
 
 proc isNibblesTerminated*(nibbles: (int, int, int, int, int, int)): bool =
@@ -97,7 +97,7 @@ proc removeNibblesTerminator*(nibbles: seq[int]): Any =
     return nibbles[0 .. ^1]
   return nibbles
 
-proc encodeNibbles*(nibbles: (int, int, int, int, int, int, int)): cstring =
+proc encodeNibbles*(nibbles: (int, int, int, int, int, int, int)): string =
   ##     The Hex Prefix function
   if isNibblesTerminated(nibbles):
     var flag = HPFLAG2
@@ -112,7 +112,7 @@ proc encodeNibbles*(nibbles: (int, int, int, int, int, int, int)): cstring =
   var prefixedValue = nibblesToBytes(flaggedNibbles)
   return prefixedValue
 
-proc decodeNibbles*(value: cstring): seq[int] =
+proc decodeNibbles*(value: string): seq[int] =
   ##     The inverse of the Hex Prefix function
   var nibblesWithFlag = bytesToNibbles(value)
   var flag = nibblesWithFlag[0]

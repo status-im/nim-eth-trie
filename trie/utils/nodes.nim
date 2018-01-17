@@ -1,49 +1,48 @@
-
 import
   trie.constants, trie.exceptions, trie.utils.binaries, trie.validation, nibbles
 
-proc getNodeType*(node: cstring): int =
+proc getNodeType*(node: string): int =
   if node == BLANKNODE:
-    return NODETYPEBLANK
+    return NODETYPE_BLANK
   elif len(node) == 2:
     (key, _) = node
     nibbles = decodeNibbles(key)
     if isNibblesTerminated(nibbles):
-      return NODETYPELEAF
+      return NODETYPE_LEAF
     else:
-      return NODETYPEEXTENSION
+      return NODETYPE_EXTENSION
   elif len(node) == 17:
-    return NODETYPEBRANCH
+    return NODETYPE_BRANCH
   else:
     raise InvalidNode("Unable to determine node type")
   
-proc getNodeType*(node: seq[cstring]): int =
+proc getNodeType*(node: seq[string]): int =
   if node == BLANKNODE:
-    return NODETYPEBLANK
+    return NODETYPE_BLANK
   elif len(node) == 2:
     (key, _) = node
     nibbles = decodeNibbles(key)
     if isNibblesTerminated(nibbles):
-      return NODETYPELEAF
+      return NODETYPE_LEAF
     else:
-      return NODETYPEEXTENSION
+      return NODETYPE_EXTENSION
   elif len(node) == 17:
-    return NODETYPEBRANCH
+    return NODETYPE_BRANCH
   else:
     raise InvalidNode("Unable to determine node type")
   
-proc isBlankNode*(node: seq[cstring]): bool =
+proc isBlankNode*(node: seq[string]): bool =
   return node == BLANKNODE
 
-proc extractKey*(node: seq[cstring]): seq[int] =
+proc extractKey*(node: seq[string]): seq[int] =
   (prefixedKey, _) = node
   var key = removeNibblesTerminator(decodeNibbles(prefixedKey))
   return key
 
-proc computeLeafKey*(nibbles: (int, int, int, int, int, int)): cstring =
+proc computeLeafKey*(nibbles: (int, int, int, int, int, int)): string =
   return encodeNibbles(addNibblesTerminator(nibbles))
 
-proc getCommonPrefixLength*(leftKey: cstring; rightKey: cstring): int =
+proc getCommonPrefixLength*(leftKey: string; rightKey: string): int =
   for idx, (leftNibble, rightNibble) in zip(leftKey, rightKey):
     if leftNibble != rightNibble:
       return idx
@@ -106,34 +105,34 @@ proc consumeCommonPrefix*(leftKey: seq[int]; rightKey: seq[int]): (Any, Any, Any
     rightRemainder = rightKey[commonPrefixLength .. ^1]
   return (commonPrefix, leftRemainder, rightRemainder)
 
-proc encodeKvNode*(keypath: cstring; childNodeHash: cstring): cstring =
+proc encodeKvNode*(keypath: string; childNodeHash: string): string =
   ##     Serializes a key/value node
-  if keypath is None or keypath == cstring"":
+  if keypath is None or keypath == string"":
     raise newException(ValidationError, "Key path can not be empty")
   validateIsBytes(keypath)
   validateIsBytes(childNodeHash)
   validateLength(childNodeHash, 32)
   return nil
 
-proc encodeKvNode*(keypath: cstring; childNodeHash: int): void =
+proc encodeKvNode*(keypath: string; childNodeHash: int): void =
   ##     Serializes a key/value node
-  if keypath is None or keypath == cstring"":
+  if keypath is None or keypath == string"":
     raise newException(ValidationError, "Key path can not be empty")
   validateIsBytes(keypath)
   validateIsBytes(childNodeHash)
   validateLength(childNodeHash, 32)
   return nil
 
-proc encodeKvNode*(keypath: cstring; childNodeHash: range): void =
+proc encodeKvNode*(keypath: string; childNodeHash: range): void =
   ##     Serializes a key/value node
-  if keypath is None or keypath == cstring"":
+  if keypath is None or keypath == string"":
     raise newException(ValidationError, "Key path can not be empty")
   validateIsBytes(keypath)
   validateIsBytes(childNodeHash)
   validateLength(childNodeHash, 32)
   return nil
 
-proc encodeBranchNode*(leftChildNodeHash: cstring; rightChildNodeHash: cstring): cstring =
+proc encodeBranchNode*(leftChildNodeHash: string; rightChildNodeHash: string): string =
   ##     Serializes a branch node
   validateIsBytes(leftChildNodeHash)
   validateLength(leftChildNodeHash, 32)
@@ -141,7 +140,7 @@ proc encodeBranchNode*(leftChildNodeHash: cstring; rightChildNodeHash: cstring):
   validateLength(rightChildNodeHash, 32)
   return nil
 
-proc encodeBranchNode*(leftChildNodeHash: cstring; rightChildNodeHash: int): void =
+proc encodeBranchNode*(leftChildNodeHash: string; rightChildNodeHash: int): void =
   ##     Serializes a branch node
   validateIsBytes(leftChildNodeHash)
   validateLength(leftChildNodeHash, 32)
@@ -157,24 +156,24 @@ proc encodeBranchNode*(leftChildNodeHash: seq[int]; rightChildNodeHash: seq[int]
   validateLength(rightChildNodeHash, 32)
   return nil
 
-proc encodeLeafNode*(value: cstring): cstring =
+proc encodeLeafNode*(value: string): string =
   ##     Serializes a leaf node
   validateIsBytes(value)
-  if value is None or value == cstring"":
+  if value is None or value == string"":
     raise newException(ValidationError, "Value of leaf node can not be empty")
   return nil
 
 proc encodeLeafNode*(value: int): void =
   ##     Serializes a leaf node
   validateIsBytes(value)
-  if value is None or value == cstring"":
+  if value is None or value == string"":
     raise newException(ValidationError, "Value of leaf node can not be empty")
   return nil
 
 proc encodeLeafNode*(value: range): void =
   ##     Serializes a leaf node
   validateIsBytes(value)
-  if value is None or value == cstring"":
+  if value is None or value == string"":
     raise newException(ValidationError, "Value of leaf node can not be empty")
   return nil
 
