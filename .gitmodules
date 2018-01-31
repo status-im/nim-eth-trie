@@ -1,6 +1,0 @@
-[submodule "nim-rlp"]
-	path = nim-rlp
-	url = https://github.com/status-im/nim-rlp
-[submodule "keccak-tiny"]
-	path = keccak-tiny
-	url = https://github.com/status-im/nim-keccak-tiny

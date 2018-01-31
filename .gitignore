@@ -1,1 +1,7 @@
+# ignore all executable files
+*
+!*.*
+!*/
+
 nimcache/
+
