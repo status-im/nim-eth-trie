@@ -31,6 +31,7 @@ proc put*(db: var MemDB, key: KeccakHash, value: BytesRange): bool =
   return true
 
 proc newMemDB*: ref MemDB =
+  result = new(ref MemDB)
   result.tbl = initTable[KeccakHash, Bytes]()
 
 static:

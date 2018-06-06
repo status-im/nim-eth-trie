@@ -1,4 +1,4 @@
-
+#[
 import
   pytest, trie.exceptions, trie.utils.nodes
 
@@ -56,4 +56,8 @@ proc testConsumeCommonPrefix*(left: seq[int]; right: seq[int];
   var expectedB = (expected[0], expected[2], expected[1])
   nil
   nil
+]#
 
+import
+  ethereum_trie/nodes
+  

@@ -1,158 +1,83 @@
 import
-  rlp, trie.constants, trie.validation, trie.exceptions, trie.utils.sha3,
-  trie.utils.binaries, trie.utils.nodes
+  keccak_tiny, ethereum_trie/types, binaries, rlp/types as rlpTypes
+
+export
+  types
 
 type
-  Hash = string
+  TrieNodeKey = object
+    hash: KeccakHash
+    usedBytes: uint8
 
-  BinaryTrie* = object of object
-    db*: void
-    rootHash*: Hash
+  BinaryTrie[DB: TrieDatabase] = object
+    dbLink: ref DB
+    rootHash: TrieNodeKey
 
-proc makeBinaryTrie*(db: Any; rootHash: Hash): BinaryTrie =
-  result.db = db
-  result.rootHash = rootHash
+let
+  BLANK_HASH     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
+  zeroBytesRange = Range[byte]()
+  
+converter toTrieNodeKey(hash: KeccakHash): TrieNodeKey =
+  result.hash = hash
+  result.usedBytes = 32
+  
+converter toTrieNodeKey(hash: BytesRange): TrieNodeKey =
+  assert hash.len == 32
+  for i in 0..<32:
+    result.hash.data[i] = uint8(hash[i])
+  result.usedBytes = 32
+  
+proc initBinaryTrie*[DB](db: ref DB): BinaryTrie[DB] =
+  result.dbLink = db
+  result.rootHash = BLANK_HASH.toTrieNodeKey
 
-proc getImpl*(self: BinaryTrie; nodeHash: Hash; keypath: string): string =
-  ##         Note: keypath should be in binary array format, i.e., encoded by encode_to_bin()
-  if nodeHash == BLANKHASH:
-    return nil
-  (nodetype, leftChild, rightChild) = parseNode(self.db[nodeHash])
-  if nodetype == LEAFTYPE:
+proc `==`(a, b: BytesRange): bool =
+  if a.len != b.len: return false
+  for i in 0..<a.len:
+    if a[i] != b[i]: return false
+  result = true
+  
+proc getAux[DB](self: BinaryTrie[DB], nodeHash: TrieNodeKey, keyPath: BinVector): BytesRange =
+  # Empty trie
+  if nodeHash == BLANK_HASH:
+    return zeroBytesRange
+
+  let (nodeType, leftChild, rightChild) = parseNode(self.dbLink[].get(nodeHash.hash).toRange)
+  # Key-value node descend
+  if nodeType == LEAF_TYPE:
+    if keyPath.len != 0: 
+      return zeroBytesRange
     return rightChild
-  elif nodetype == KVTYPE:
-    if notkeypath:
-      return None
-    if keypath[0 .. ^1] == leftChild:
-      return self.getImpl(rightChild, keypath[len(leftChild) ..< nil])
+  elif nodeType == KV_TYPE:
+    # Keypath too short
+    if keyPath.len == 0:
+      return zeroBytesRange
+    if keyPath[0..leftChild.len] == leftChild:
+      return self.getAux(rightChild, keyPath[leftChild.len.. ^1])
     else:
-      return None
-  elif nodetype == BRANCHTYPE:
-    if notkeypath:
-      return None
-    if keypath[0 .. ^1] == BYTE0:
-      return self.getImpl(leftChild, keypath[1 ..< nil])
+      return zeroBytesRange
+  # Branch node descend
+  elif nodeType == BRANCH_TYPE:
+    # Keypath too short
+    if keyPath.len == 0:
+      return zeroBytesRange
+    if keyPath[0] == byte('0'):
+      return self.getAux(leftChild, keyPath[1..^1])
     else:
-      return self.getImpl(rightChild, keypath[1 ..< nil])
+      return self.getAux(rightChild, keyPath[1..^1])
+      
+proc get[DB](self: BinaryTrie[DB], key: BytesRange): BytesRange =
+  return self.getAux(self.root_hash, encode_to_bin(key))
+
+import ethereum_trie/memdb
+
+proc main() =
+  var db = newMemDB()
+  var trie = initBinaryTrie(db)
+    
+  var key = toRange(@[1.byte, 2.byte, 3.byte])
+  var res = trie.get(key)
   
-proc get*(self: BinaryTrie; key: string): string =
-  ##         Fetches the value with a given keypath from the given node.
-  ## 
-  ##         Key will be encoded into binary array format first.
-  return self.getImpl(self.rootHash, encodeToBin(key))
+main()
 
-proc setImpl*(self: BinaryTrie; nodeHash: string; keypath: string; value: string;
-            ifDeleteSubtrie: bool): string =
-  ##         If if_delete_subtrie is set to True, what it will do is that it take in a keypath
-  ##         and traverse til the end of keypath, then delete the whole subtrie of that node.
-  ## 
-  ##         Note: keypath should be in binary array format, i.e., encoded by encode_to_bin()
-  if nodeHash == BLANKHASH:
-    if value:
-      return self.hashAndSave(encodeKvNode(keypath,
-          self.hashAndSave(encodeLeafNode(value))))
-    else:
-      return BLANKHASH
-  (nodetype, leftChild, rightChild) = parseNode(self.db[nodeHash])
-  if nodetype == LEAFTYPE:
-    if keypath:
-      raise newException(LeafNodeOverrideError, "Existing kv pair is being effaced because it\'s key is the prefix of the new key")
-    if ifDeleteSubtrie:
-      return BLANKHASH
-    return nil
-  elif nodetype == KVTYPE:
-    if notkeypath:
-      if ifDeleteSubtrie:
-        return BLANKHASH
-      return nodeHash
-    return self.setKvNode(keypath, nodeHash, nodetype, leftChild, rightChild, value,
-                          ifDeleteSubtrie)
-  elif nodetype == BRANCHTYPE:
-    if notkeypath:
-      if ifDeleteSubtrie:
-        return BLANKHASH
-      return nodeHash
-    return self.setBranchNode(keypath, nodetype, leftChild, rightChild, value,
-                              ifDeleteSubtrie)
-  raise newException(Exception, "Invariant: This shouldn\'t ever happen")
-
-proc set*(self: BinaryTrie; key: string; value: string): void =
-  ##         Sets the value at the given keypath from the given node
-  ## 
-  ##         Key will be encoded into binary array format first.
-  self.rootHash = self.setImpl(self.rootHash, encodeToBin(key), value)
-
-proc setKvNode*(self: BinaryTrie; keypath: string; nodeHash: string;
-                 nodeType: int; leftChild: string; rightChild: string;
-                 value: string; ifDeleteSubtrie: bool): string =
-  if ifDeleteSubtrie:
-    if len(keypath) < len(leftChild) and keypath == leftChild[0 ..< len(keypath)]:
-      return BLANKHASH
-  if keypath[0 ..< len(leftChild)] == leftChild:
-    var subnodeHash = self.setImpl(rightChild, keypath[len(leftChild) .. ^1], value,
-                             ifDeleteSubtrie)
-    if subnodeHash == BLANKHASH:
-      return BLANKHASH
-    (subnodetype, subLeftChild, subRightChild) = parseNode(self.db[subnodeHash])
-    if subnodetype == KVTYPE:
-      return self.hashAndSave(encodeKvNode(nil, subRightChild))
-    else:
-      return self.hashAndSave(encodeKvNode(leftChild, subnodeHash))
-  else:
-    commonPrefixLen = getCommonPrefixLength(leftChild, keypath[0 .. ^1])
-    if :
-      return nodeHash
-    if len(keypath) == commonPrefixLen + 1:
-      valnode = self.hashAndSave(encodeLeafNode(value))
-    else:
-      valnode = self.hashAndSave(encodeKvNode(
-          keypath[commonPrefixLen + 1 ..< nil],
-          self.hashAndSave(encodeLeafNode(value))))
-    if len(leftChild) == commonPrefixLen + 1:
-      oldnode = rightChild
-    else:
-      oldnode = self.hashAndSave(encodeKvNode(
-          leftChild[commonPrefixLen + 1 ..< nil], rightChild))
-    if keypath[commonPrefixLen ..< commonPrefixLen + 1] == BYTE1:
-      newsub = self.hashAndSave(encodeBranchNode(oldnode, valnode))
-    else:
-      newsub = self.hashAndSave(encodeBranchNode(valnode, oldnode))
-    if commonPrefixLen:
-      return self.hashAndSave(encodeKvNode(leftChild[0 .. ^1], newsub))
-    else:
-      return newsub
-  
-proc setBranchNode*(self: BinaryTrie; keypath: string; nodeType: int;
-                      leftChild: string; rightChild: string; value: string;
-                      ifDeleteSubtrie: bool): string =
-  if keypath[0 ..< 1] == BYTE0:
-    var
-      newLeftChild = self.setImpl(leftChild, keypath[1 .. ^1], value, ifDeleteSubtrie)
-      newRightChild = rightChild
-  else:
-    newRightChild = self.setImpl(rightChild, keypath[1 ..< nil], value, ifDeleteSubtrie)
-    newLeftChild = leftChild
-  if newLeftChild == BLANKHASH or newRightChild == BLANKHASH:
-    (subnodetype, subLeftChild, subRightChild) = parseNode(self.db[nil])
-    var firstBit = nil
-    if subnodetype == KVTYPE:
-      return self.hashAndSave(encodeKvNode(nil, subRightChild))
-    elif subnodetype in (BRANCHTYPE, LEAFTYPE):
-      return self.hashAndSave(encodeKvNode(firstBit, ))
-  else:
-    return self.hashAndSave(encodeBranchNode(newLeftChild, newRightChild))
-  
-proc deleteSubtrie*(self: BinaryTrie; key: string): void =
-  ##         Given a key prefix, delete the whole subtrie that starts with the key prefix.
-  ## 
-  ##         Key will be encoded into binary array format first.
-  ## 
-  ##         It will call `setImpl` with `if_delete_subtrie` set to True.
-  self.rootHash = self.setImpl(self.rootHash, encodeToBin(key))
-
-proc hashAndSave*(self: BinaryTrie; node: string): string =
-  ##         Saves a node into the database and returns its hash
-  var nodeHash = keccak(node)
-  self.db[nodeHash] = node
-  return nodeHash
 
