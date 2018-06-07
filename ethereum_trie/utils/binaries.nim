@@ -22,7 +22,7 @@ const
   PREFIX_00 = "00"
   PREFIX_100000 = "100000"
 
-func encode_to_bin*(value: BytesRange): BinVector =
+func encodeToBin*(value: BytesRange): BinVector =
   ## ASCII -> 0100000101010111010000110100100101001001
   var bv = newRange[byte](value.len * 8)
   var i = 0
@@ -32,7 +32,7 @@ func encode_to_bin*(value: BytesRange): BinVector =
       inc i
   result = bv.BinVector
 
-func decode_from_bin*(bin: BinVector): Bytes =
+func decodeFromBin*(bin: BinVector): Bytes =
   ## 0100000101010111010000110100100101001001 -> ASCII
   assert (bin.len mod 8) == 0
   result = newSeq[byte](bin.len div 8)
@@ -49,7 +49,7 @@ proc concat[T](a: T, b: BinVector): BinVector =
   for i in 0..<b.len: bin[i+a.len] = byte(b[i])
   result = bin.BinVector
 
-func encode_from_bin_keypath*(bin: BinVector): Bytes =
+func encodeFromBinKeypath*(bin: BinVector): Bytes =
   ## Encodes a sequence of 0s and 1s into tightly packed bytes
   ## Used in encoding key path of a KV-NODE
   let
@@ -59,10 +59,10 @@ func encode_from_bin_keypath*(bin: BinVector): Bytes =
 
   if padded_bin_len mod 8 == 4:
     let prefixVal = PREFIX_00 & prefix & padding
-    return decode_from_bin(concat(prefixVal, bin))
+    return decodeFromBin(concat(prefixVal, bin))
   else:
     let prefixVal = PREFIX_100000 & prefix & padding
-    return decode_from_bin(concat(prefixVal, bin))
+    return decodeFromBin(concat(prefixVal, bin))
 
 proc cmp[T](a: BytesRange, b: T): bool =
   if a.len != b.len: return false
@@ -75,13 +75,13 @@ proc index[T](a: openArray[T], b: BytesRange): int =
   for i in 0..<a.len:
     if cmp(b, a[i]): return i
 
-func decode_to_bin_keypath*(path: BytesRange): BinVector =
+proc decodeToBinKeypath*(path: BytesRange): BinVector =
   # Decodes bytes into a sequence of 0s and 1s
   # Used in decoding key path of a KV-NODE
-  var path = encode_to_bin(path).BytesRange
+  var path = encodeToBin(path).BytesRange
   if path[0] == 1:
     path = path[4..^1]
 
-  assert path[0..2].cmp(PREFIX_00)
-  let padded_len = TWO_BITS.index(path[2..4])
-  path[4+((4 - padded_len) mod 4)..^1].BinVector
+  assert path[0..<2].cmp(PREFIX_00)
+  let paddedLen = TWO_BITS.index(path[2..<4])
+  path[4+((4 - paddedLen) mod 4)..^1].BinVector

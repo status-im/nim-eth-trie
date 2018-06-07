@@ -7,16 +7,21 @@ type
     BRANCH_TYPE = 1
     LEAF_TYPE = 2
 
+  TrieNode* = tuple[typ: TrieNodeType; leftChild, rightChild: BytesRange]
+
   InvalidNode* = object of Exception
 
 const
-  zeroBytesRange = Range[byte]()
+  zeroBytesRange* = Range[byte]()
 
-proc parseNode(node: BytesRange): tuple[typ: TrieNodeType; leftChild, rightChild: BytesRange] =
+proc parseNode*(node: BytesRange): TrieNode =
   # Input: a serialized node
 
   if node.len == 0:
     raise newException(InvalidNode, "Blank node is not a valid node type in Binary Trie")
+
+  if node[0].ord < low(TrieNodeType).ord or node[0].ord > high(TrieNodeType).ord:
+    raise newException(InvalidNode, "Invalid node type")
 
   let nodeType = node[0].TrieNodeType
   case nodeType
@@ -24,7 +29,7 @@ proc parseNode(node: BytesRange): tuple[typ: TrieNodeType; leftChild, rightChild
     if node.len != 65:
       raise newException(InvalidNode, "Invalid branch node, both child node should be 32 bytes long each")
     # Output: node type, left child, right child
-    let ret = (BRANCH_TYPE, node[1..33], node[33..^1])
+    let ret = (BRANCH_TYPE, node[1..<33], node[33..^1])
     assert(ret[1].len == 32)
     assert(ret[2].len == 32)
     return ret
