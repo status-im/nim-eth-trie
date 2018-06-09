@@ -4,8 +4,8 @@ type
   BinVector* = BytesRange
 
 const
-  binaryZero = byte('0')
-  binaryOne = byte('1')
+  binaryZero = byte(0x00)
+  binaryOne = byte(0x01)
 
 func generateMask(): array[8, byte] {.compileTime.} =
   for i in 0..<8:
@@ -13,9 +13,9 @@ func generateMask(): array[8, byte] {.compileTime.} =
 
 const
   byteMask = generateMask()
-  TWO_BITS = ["00", "01", "10", "11"]
-  PREFIX_00 = "00"
-  PREFIX_100000 = "100000"
+  TWO_BITS = ["\x00\x00", "\x00\x01", "\x01\x00", "\x11\x11"]
+  PREFIX_00 = "\x00\x00"
+  PREFIX_100000 = "\x01\x00\x00\x00\x00\x00"
 
 proc encodeToBin*(value: BytesRange): Bytes =
   ## ASCII -> "0100000101010011010000110100100101001001"
@@ -51,23 +51,21 @@ proc encodeFromBinKeypath*(bin: BinVector): Bytes =
     padding = repeat(binaryZero.char, ((not bin.len) + 1) and 3) # modulo 4 padding
     padded_bin_len = bin.len + padding.len
     prefix = TWO_BITS[bin.len mod 4]
-    
+
   if padded_bin_len mod 8 == 4:
-    echo "A: ", padding.len
     let prefixVal = PREFIX_00 & prefix & padding
     return decodeFromBin(concat(prefixVal, bin))
   else:
-    echo "B: ", padding.len
     let prefixVal = PREFIX_100000 & prefix & padding
     return decodeFromBin(concat(prefixVal, bin))
 
-func cmp[T](a: BytesRange, b: T): bool =
+func cmp[T](a: Bytes, b: T): bool =
   if a.len != b.len: return false
   for i in 0..<a.len:
     if a[i].byte != b[i].byte: return false
   true
 
-func index[T](a: openArray[T], b: BytesRange): int =
+func index[T](a: openArray[T], b: Bytes): int =
   result = -1
   for i in 0..<a.len:
     if cmp(b, a[i]): return i
@@ -75,14 +73,14 @@ func index[T](a: openArray[T], b: BytesRange): int =
 func decodeToBinKeypath*(path: BytesRange): Bytes =
   # Decodes bytes into a sequence of 0s and 1s
   # Used in decoding key path of a KV-NODE
-  var path = encodeToBin(path).toRange
+  var path = encodeToBin(path)
   if path[0] == binaryOne:
     path = path[4..^1]
 
   assert path[0..<2].cmp(PREFIX_00)
   let paddedLen = TWO_BITS.index(path[2..<4])
   if path.len > 4:
-    result = toSeq(path[4+((4 - paddedLen) mod 4)..^1])
+    result = path[4+((4 - paddedLen) mod 4)..^1]
   else:
     result = @[]
 

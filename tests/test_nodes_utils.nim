@@ -59,7 +59,7 @@ proc testConsumeCommonPrefix*(left: seq[int]; right: seq[int];
 ]#
 
 import
-  ethereum_trie/nodes, test_utils
+  ethereum_trie/nodes, test_utils, rlp/types, unittest
 
 const
   None = ""
@@ -78,18 +78,29 @@ const
     "\x03": (0, None, None)
   }
 
-proc test_binary_trie_node_parsing() =
+test "binary_trie_node_parsing":
   var x = 0
   for c in parseNodeData:
     let input = toBytesRange(c[0])
     let node = c[1]
-    let output = (TrieNodeType(node[0]), toBytesRange(node[1]), toBytesRange(node[2])).TrieNode
+    let kind = TrieNodeKind(node[0])
+    let one = toBytesRange(node[1])
+    let two = toBytesRange(node[2])
     try:
       let res = parseNode(input)
+      doAssert(kind == res.kind)
+      case res.kind
+      of KV_TYPE:
+        check(res.keyPath == one)
+        check(res.child == two)
+      of BRANCH_TYPE:
+        check(res.leftChild == one)
+        check(res.rightChild == two)
+      of LEAF_TYPE:
+        check(res.value == two)
     except InvalidNode as E:
       discard
     except:
+      echo getCurrentExceptionMsg()
       doAssert(false)
     inc x
-
-test_binary_trie_node_parsing()

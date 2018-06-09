@@ -44,7 +44,7 @@ proc parseNode*(node: BytesRange): TrieNode =
     if node.len <= 33:
       raise newException(InvalidNode, "Invalid kv node, short of key path or child node hash")
     # Output: node type, keypath, child
-    return TrieNode(kind: KV_TYPE, keyPath: decodeToBinKeypath(node[1..^32]).toRange, child: node[^32..^1])
+    return TrieNode(kind: KV_TYPE, keyPath: decodeToBinKeypath(node[1..^33]).toRange, child: node[^32..^1])
   of LEAF_TYPE:
     if node.len == 1:
       raise newException(InvalidNode, "Invalid leaf node, can not contain empty value")
