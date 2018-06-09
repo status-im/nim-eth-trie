@@ -16,7 +16,7 @@ type
 let
   BLANK_HASH     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
   zeroBytesRange = Range[byte]()
-  
+
 converter toTrieNodeKey(hash: KeccakHash): TrieNodeKey =
   result.hash = hash
   result.usedBytes = 32
