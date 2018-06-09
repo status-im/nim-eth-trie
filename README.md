@@ -5,15 +5,15 @@ Nim Implementation of the Ethereum Trie structure
 [![Build Status][badge-nimtrie-travisci]][nimtrie-travisci]
 [![Build status][badge-nimtrie-appveyor]][nimtrie-appveyor]
 
-### Node Types
+### Node-Types
 * KV
-  0, encoded key path, 32 byte hash
+  0, encoded-key-path, 32 bytes hash
 * BRANCH
-  1, 32 byte hash, 32 byte hash
+  1, 32 bytes hash, 32 bytes hash
 * LEAF
-  2, Nothing, value
+  2, value
 
-### encoded key path
+### encoded-key-path
 ```text
             |--------- odd --------|
        00mm yyyy xxxx xxxx xxxx xxxx
@@ -27,6 +27,11 @@ mm   number of padding bits
 00   zero zero prefix
 1000 even numbered nibbles prefix
 
+unlike hexary-trie, binary store it's data into flat-db without using rlp encoding.
+binary-trie store its value using simple Node-Types encoding.
+the encoded-node will be hashed by keccak_256 and the hash value will be the key to flat-db.
+so each entry in the flat-db will looks like
+{32-bytes-keccak-hash: encoded-node(KV or BRANCH or LEAF encoded)}
 
 [nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie

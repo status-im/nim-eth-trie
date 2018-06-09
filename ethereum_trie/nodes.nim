@@ -86,7 +86,7 @@ proc encodeLeafNode*(value: BytesRange): Bytes =
   result[0] = LEAF_TYPE.byte
   copyMem(result[1].addr, value.baseAddr, value.len)
 
-proc getCommonPrefixLength(a, b: BytesRange): int =
+proc getCommonPrefixLength*(a, b: BytesRange): int =
   let len = min(a.len, b.len)
   for i in 0..<len:
     if a[i] != b[i]: return i
