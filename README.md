@@ -15,7 +15,7 @@ The primary difference with Hexary-trie is, each node of Binary-trie only consis
 while Hexary-trie node can contains up to 16 child-node.
 
 Unlike Hexary-trie, Binary-trie store it's data into flat-db without using rlp encoding.
-Binary-trie store its value using simple Node-Types encoding.
+Binary-trie store its value using simple **Node-Types** encoding.
 The encoded-node will be hashed by keccak_256 and the hash value will be the key to flat-db.
 Each entry in the flat-db will looks like:
 
