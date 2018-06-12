@@ -20,7 +20,7 @@ proc del*(db: var MemDB, key: KeccakHash): bool =
   else:
     return false
 
-proc toSeq(r: BytesRange): Bytes =
+proc toSeq(r: BytesRange): Bytes {.used.} =
   newSeq(result, r.len)
   for i in 0 ..< r.len:
     result[i] = r[i]
@@ -28,6 +28,10 @@ proc toSeq(r: BytesRange): Bytes =
 
 proc put*(db: var MemDB, key: KeccakHash, value: BytesRange): bool =
   db.tbl[key] = value.toSeq
+  return true
+
+proc put*(db: var MemDB, key: KeccakHash, value: Bytes): bool =
+  db.tbl[key] = value
   return true
 
 proc newMemDB*: ref MemDB =

@@ -1,11 +1,11 @@
-import rlp/types, strutils
+import rlp/types, strutils, ethereum_trie/utils
 
 type
   BinVector* = BytesRange
 
 const
-  binaryZero = byte(0x00)
-  binaryOne = byte(0x01)
+  binaryZero* = byte(0x00)
+  binaryOne* = byte(0x01)
 
 func generateMask(): array[8, byte] {.compileTime.} =
   for i in 0..<8:
@@ -39,11 +39,6 @@ proc decodeFromBin*(bin: Bytes): Bytes =
       inc x
     result[i] = b
 
-func concat[T](a: T, b: BinVector): Bytes =
-  result = newSeq[byte](a.len + b.len)
-  for i in 0..<a.len: result[i] = byte(a[i])
-  for i in 0..<b.len: result[i+a.len] = byte(b[i])
-
 proc encodeFromBinKeypath*(bin: BinVector): Bytes =
   ## Encodes a sequence of 0s and 1s into tightly packed bytes
   ## Used in encoding key path of a KV-NODE
@@ -53,11 +48,11 @@ proc encodeFromBinKeypath*(bin: BinVector): Bytes =
     prefix = TWO_BITS[bin.len mod 4]
 
   if padded_bin_len mod 8 == 4:
-    let prefixVal = PREFIX_00 & prefix & padding
-    return decodeFromBin(concat(prefixVal, bin))
+    let prefixVal = toRange(PREFIX_00 & prefix & padding)
+    return decodeFromBin(prefixVal & bin)
   else:
-    let prefixVal = PREFIX_100000 & prefix & padding
-    return decodeFromBin(concat(prefixVal, bin))
+    let prefixVal = toRange(PREFIX_100000 & prefix & padding)
+    return decodeFromBin(prefixVal & bin)
 
 proc decodeToBinKeypath*(path: BytesRange): Bytes =
   ## Decodes bytes into a sequence of 0s and 1s

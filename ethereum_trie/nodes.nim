@@ -53,7 +53,7 @@ proc parseNode*(node: BytesRange): TrieNode =
   else:
     raise newException(InvalidNode, "Unable to parse node")
 
-proc encodeKVNode*(keyPath: Bytes, childNodeHash: Bytes): Bytes =
+proc encodeKVNode*(keyPath, childNodeHash: BytesRange | Bytes): Bytes =
   ## Serializes a key/value node
 
   if keyPath.len == 0:
@@ -63,21 +63,19 @@ proc encodeKVNode*(keyPath: Bytes, childNodeHash: Bytes): Bytes =
   let encodedKey = encodeFromBinKeypath(keyPath.toRange)
   result = @[KV_TYPE.byte].concat(encodedKey, childNodeHash)
 
-proc encodeBranchNode*(leftChildNodeHash, rightChildNodeHash: Bytes): Bytes =
+proc encodeBranchNode*(leftChildNodeHash, rightChildNodeHash: BytesRange | Bytes): Bytes =
   ## Serializes a branch node
 
   assert(leftChildNodeHash.len == 32)
   assert(rightChildNodeHash.len == 32)
   result = @[BRANCH_TYPE.byte].concat(leftChildNodeHash, rightChildNodeHash)
 
-proc encodeLeafNode*(value: BytesRange): Bytes =
+proc encodeLeafNode*(value: BytesRange | Bytes): Bytes =
   ## Serializes a leaf node
 
   if value.len == 0:
     raise newException(ValidationError, "Value of leaf node can not be empty")
-  result = newSeq[byte](value.len + 1)
-  result[0] = LEAF_TYPE.byte
-  copyMem(result[1].addr, value.baseAddr, value.len)
+  result = @[LEAF_TYPE.byte].concat(value)
 
 proc getCommonPrefixLength*(a, b: BytesRange): int =
   let len = min(a.len, b.len)
