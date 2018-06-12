@@ -223,15 +223,15 @@ proc setKVNode(self: BinaryTrie, keyPath: BinVector, nodeHash: BytesRange, node:
     else:
       return newSub
 
-proc exists*(self: BinaryTrie, key: BytesRange): bool =
+template exists*(self: BinaryTrie, key: BytesRange): bool =
   self.get(key) != zeroBytesRange
 
-proc delete*(self: BinaryTrie, key: BytesRange) =
+template delete*(self: BinaryTrie, key: BytesRange) =
   ## Equals to setting the value to zeroBytesRange
 
   self.rootHash = self.setAux(self.rootHash, encodeToBin(key), zeroBytesRange)
 
-proc deleteSubtrie*(self: BinaryTrie, key: BytesRange) =
+template deleteSubtrie*(self: BinaryTrie, key: BytesRange) =
   ## Given a key prefix, delete the whole subtrie that starts with the key prefix.
   ## Key will be encoded into binary array format first.
   ## It will call `_set` with `if_delete_subtrie` set to True.
@@ -239,18 +239,43 @@ proc deleteSubtrie*(self: BinaryTrie, key: BytesRange) =
   self.rootHash = self.setAux(self.rootHash, encodeToBin(key), zeroBytesRange, true)
 
 # Convenience
-proc rootNode*(self: BinaryTrie): BytesRange =
+template rootNode*(self: BinaryTrie): BytesRange =
   self.queryDB(self.rootHash)
 
-proc rootNode*(self: BinaryTrie, node: BytesRange) =
+template rootNode*(self: BinaryTrie, node: BytesRange) =
   self.rootHash = self.hashAndSave(node)
 
 # Dictionary API
-proc `[]`*(self: BinaryTrie, key: BytesRange): BytesRange =
+template `[]`*(self: BinaryTrie, key: BytesRange): BytesRange =
   self.get(key)
 
-proc `[]=`*(self: BinaryTrie, key, value: BytesRange) =
+template `[]=`*(self: BinaryTrie, key, value: BytesRange) =
   self.set(key, value)
 
-proc contains*(self: BinaryTrie, key: BytesRange): bool =
+template contains*(self: BinaryTrie, key: BytesRange): bool =
   self.exists(key)
+
+# More convenience API
+template set*(self: var BinaryTrie, key, value: Bytes | string) =
+  self.set(toRange(key), toRange(value))
+
+template get*(self: BinaryTrie, key: Bytes | string): BytesRange =
+  self.get(toRange(key), toRange(value))
+
+template `[]`*(self: BinaryTrie, key: Bytes | string): BytesRange =
+  self.get(toRange(key))
+
+template `[]=`*(self: BinaryTrie, key, value: Bytes | string) =
+  self.set(toRange(key), toRange(value))
+
+template exists*(self: BinaryTrie, key: Bytes | string): bool =
+  self.get(toRange(key)) != zeroBytesRange
+
+template delete*(self: BinaryTrie, key: Bytes | string) =
+  self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange)
+
+template deleteSubtrie*(self: BinaryTrie, key: Bytes | string) =
+  self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange, true)
+
+template rootNode*(self: BinaryTrie, node: Bytes | string) =
+  self.rootHash = self.hashAndSave(toRange(node))
