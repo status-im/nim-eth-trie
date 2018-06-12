@@ -1,24 +1,13 @@
+import ethereum_trie/[memdb, binary, utils], rlp/types
 
-import
-  pytest, hypothesis, trie.binary, trie.constants, trie.exceptions
+proc main() =
+  var db = newMemDB()
+  var trie = initBinaryTrie(db)
 
-var st = hypothesis.strategies
-proc testBinTrieDeleteSubtrie*(kv1: (); kv2: (); keyToBeDeleted: cstring;
-                              willDelete: bool; willRasieError: bool): void =
-  var trie = BinaryTrie()
-  trie.set(kv1[0], kv1[1])
-  trie.set(kv2[0], kv2[1])
-  nil
-  nil
-  if willDelete:
-    trie.deleteSubtrie(keyToBeDeleted)
-    nil
-    nil
-    nil
-  elif willRasieError:
-    with
-      trie.deleteSubtrie(keyToBeDeleted)
-  else:
-    rootHashBeforeDelete = trie.rootHash
-    trie.deleteSubtrie(keyToBeDeleted)
-  
+  var key = toRange(@[1.byte, 2.byte, 3.byte])
+  var res = trie.get(key)
+  #let hash = trie.hashAndSave(key)
+  #echo toHex(hash)
+  trie.set(key, key)
+
+main()

@@ -27,10 +27,10 @@ proc initBinaryTrie*[DB](db: ref DB): BinaryTrie[DB] =
   result.dbLink = db
   result.rootHash = BLANK_HASH
 
-proc queryDB[DB](self: BinaryTrie[DB], nodeHash: BytesRange): BytesRange =
+proc queryDB(self: BinaryTrie, nodeHash: BytesRange): BytesRange =
   self.dbLink[].get(nodeHash.toHash).toRange
 
-proc getAux[DB](self: BinaryTrie[DB], nodeHash: BytesRange, keyPath: BinVector): BytesRange =
+proc getAux(self: BinaryTrie, nodeHash: BytesRange, keyPath: BinVector): BytesRange =
   # Empty trie
   if nodeHash == BLANK_HASH:
     return zeroBytesRange
@@ -56,21 +56,21 @@ proc getAux[DB](self: BinaryTrie[DB], nodeHash: BytesRange, keyPath: BinVector):
     else:
       return self.getAux(node.rightChild, keyPath[1..^1])
 
-proc get*[DB](self: BinaryTrie[DB], key: BytesRange): BytesRange =
+proc get*(self: BinaryTrie, key: BytesRange): BytesRange =
   return self.getAux(self.rootHash, encodeToBin(key).toRange)
 
-proc hashAndSave[DB](self: BinaryTrie[DB], node: BytesRange|Bytes): BytesRange =
+proc hashAndSave(self: BinaryTrie, node: BytesRange|Bytes): BytesRange =
   let nodeHash = keccak_256(node.toMemRange)
   discard self.dbLink[].put(nodeHash, node)
   result = nodeHash.toBytesRange
 
-proc setBranchNode[DB](self: BinaryTrie[DB], keyPath: BinVector, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange
-proc setKVNode[DB](self: BinaryTrie[DB], keyPath: BinVector, nodeHash: BytesRange, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange
+proc setBranchNode(self: BinaryTrie, keyPath: BinVector, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange
+proc setKVNode(self: BinaryTrie, keyPath: BinVector, nodeHash: BytesRange, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange
 
 const
   overrideErrorMsg = "Fail to set the value because the prefix of it's key is the same as existing key"
 
-proc setAux[DB](self: BinaryTrie[DB], nodeHash: BytesRange, keyPath: BinVector, value: BytesRange, deleteSubtrie = false): BytesRange =
+proc setAux(self: BinaryTrie, nodeHash: BytesRange, keyPath: BinVector, value: BytesRange, deleteSubtrie = false): BytesRange =
   ## If deleteSubtrie is set to True, what it will do is that it take in a keyPath
   ## and traverse til the end of keyPath, then delete the whole subtrie of that node.
   ## Note: keyPath should be in binary array format, i.e., encoded by encode_to_bin()
@@ -111,13 +111,13 @@ proc setAux[DB](self: BinaryTrie[DB], nodeHash: BytesRange, keyPath: BinVector, 
     return self.setBranchNode(keyPath, node, value, deleteSubtrie)
   raise newException(Exception, "Invariant: This shouldn't ever happen")
 
-proc set*[DB](self: var BinaryTrie[DB], key, value: BytesRange) =
+proc set*(self: var BinaryTrie, key, value: BytesRange) =
   ## Sets the value at the given keyPath from the given node
   ## Key will be encoded into binary array format first.
 
   self.rootHash = self.setAux(self.rootHash, encodeToBin(key).toRange, value)
 
-proc setBranchNode[DB](self: BinaryTrie[DB], keyPath: BinVector, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange =
+proc setBranchNode(self: BinaryTrie, keyPath: BinVector, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange =
   # Which child node to update? Depends on first bit in keyPath
   var newLeftChild, newRightChild: BytesRange
 
@@ -148,7 +148,7 @@ proc setBranchNode[DB](self: BinaryTrie[DB], keyPath: BinVector, node: TrieNode,
   else:
     return self.hashAndSave(encodeBranchNode(newLeftChild, newRightChild))
 
-proc setKVNode[DB](self: BinaryTrie[DB], keyPath: BinVector, nodeHash: BytesRange, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange =
+proc setKVNode(self: BinaryTrie, keyPath: BinVector, nodeHash: BytesRange, node: TrieNode, value: BytesRange, deleteSubtrie = false): BytesRange =
   # keyPath prefixes match
   if deleteSubtrie:
     if keyPath.len < node.leftChild.len and keyPath == node.leftChild[0..<keyPath.len]:
@@ -223,18 +223,34 @@ proc setKVNode[DB](self: BinaryTrie[DB], keyPath: BinVector, nodeHash: BytesRang
     else:
       return newSub
 
-import ethereum_trie/memdb
+proc exists*(self: BinaryTrie, key: BytesRange): bool =
+  self.get(key) != zeroBytesRange
 
-proc main() =
-  var db = newMemDB()
-  var trie = initBinaryTrie(db)
+proc delete*(self: BinaryTrie, key: BytesRange) =
+  ## Equals to setting the value to zeroBytesRange
 
-  var key = toRange(@[1.byte, 2.byte, 3.byte])
-  var res = trie.get(key)
-  let hash = trie.hashAndSave(key)
-  echo toHex(hash)
-  trie.set(key, key)
+  self.rootHash = self.setAux(self.rootHash, encodeToBin(key), zeroBytesRange)
 
-main()
+proc deleteSubtrie*(self: BinaryTrie, key: BytesRange) =
+  ## Given a key prefix, delete the whole subtrie that starts with the key prefix.
+  ## Key will be encoded into binary array format first.
+  ## It will call `_set` with `if_delete_subtrie` set to True.
 
+  self.rootHash = self.setAux(self.rootHash, encodeToBin(key), zeroBytesRange, true)
 
+# Convenience
+proc rootNode*(self: BinaryTrie): BytesRange =
+  self.queryDB(self.rootHash)
+
+proc rootNode*(self: BinaryTrie, node: BytesRange) =
+  self.rootHash = self.hashAndSave(node)
+
+# Dictionary API
+proc `[]`*(self: BinaryTrie, key: BytesRange): BytesRange =
+  self.get(key)
+
+proc `[]=`*(self: BinaryTrie, key, value: BytesRange) =
+  self.set(key, value)
+
+proc contains*(self: BinaryTrie, key: BytesRange): bool =
+  self.exists(key)
