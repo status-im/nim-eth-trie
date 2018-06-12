@@ -14,21 +14,21 @@ proc generateRandomZeroOne(len: int): Bytes =
   for i in 0..<len:
     result[i] = byte(random.rand(1))
 
-test "basic_test":
+test "basic test":
   let binbin = parseBin("0100000101010011010000110100100101001001")
   check(encodeToBin(br("ASCII")) == binbin)
 
   let asc = decodeFromBin(binbin)
   check(asc == b("ASCII"))
 
-test "test_full_8bit":
+test "test full 8bit":
   for i in 0..1024:
     let ori = generateBytes(i)
     let bin = ori.encodeToBin()
     let res = bin.decodeFromBin().toRange
     check(ori == res)
 
-test "test_keypath_encoding":
+test "test keypath encoding":
   for i in 0..1024:
     var value = generateRandomZeroOne(i)
     var bk = encodeFromBinKeypath(value.toRange)

@@ -59,7 +59,25 @@ proc testConsumeCommonPrefix*(left: seq[int]; right: seq[int];
 ]#
 
 import
-  ethereum_trie/nodes, test_utils, rlp/types, unittest
+  ethereum_trie/nodes, test_utils, rlp/types, unittest, strutils
+
+const
+  commonPrefixData = [
+    (@[], @[], 0),
+    (@[], @[1], 0),
+    (@[1], @[1], 1),
+    (@[1], @[1, 1], 1),
+    (@[1, 2], @[1, 1], 1),
+    (@[1, 2, 3, 4, 5, 6], @[1, 2, 3, 5, 6], 3)
+  ]
+
+test "get common prefix length":
+  for c in commonPrefixData:
+    let actual_a = getCommonPrefixLength(c[0].toBytesRange, c[1].toBytesRange)
+    let actual_b = getCommonPrefixLength(c[1].toBytesRange, c[0].toBytesRange)
+    let expected = c[2]
+    check actual_a == actual_b
+    check actual_a == expected
 
 const
   None = ""
@@ -78,7 +96,7 @@ const
     "\x03": (0, None, None)
   }
 
-test "binary_trie_node_parsing":
+test "binary trie node parsing":
   var x = 0
   for c in parseNodeData:
     let input = toBytesRange(c[0])
@@ -104,3 +122,63 @@ test "binary_trie_node_parsing":
       echo getCurrentExceptionMsg()
       doAssert(false)
     inc x
+
+const
+  kvData = [
+    ("\x00", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x00\x10\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
+    (""    , "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
+    ("\x00", "\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
+    ("\x01", "\x00\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
+    ("\x02", "", None)
+  ]
+
+test "binary trie kv node encoding":
+  for c in kvData:
+    let keyPath = b(c[0])
+    let node    = b(c[1])
+    let output  = b(c[2])
+
+    try:
+      check output == encodeKVNode(keyPath, node)
+    except ValidationError as E:
+      discard
+    except:
+      check(getCurrentExceptionMsg() == "len(childNodeHash) == 32 ")
+
+const
+  branchData = [
+    ("\xc8\x9e\xfd\xaaT\xc0\xf2\x0cz\xdfa(\x82\xdf\tP\xf5\xa9Qc~\x03\x07\xcd\xcbLg/)\x8b\x8b\xc6", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p",
+       "\x01\xc8\x9e\xfd\xaaT\xc0\xf2\x0cz\xdfa(\x82\xdf\tP\xf5\xa9Qc~\x03\x07\xcd\xcbLg/)\x8b\x8b\xc6\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
+    ("", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
+    ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x01", None),
+    ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "12345", None),
+    (repeat('\x01', 33), repeat('\x01', 32), None),
+  ]
+
+test "binary trie branch node encode":
+  for c in branchData:
+    let left   = b(c[0])
+    let right  = b(c[1])
+    let output = b(c[2])
+
+    try:
+      check output == encodeBranchNode(left, right)
+    except AssertionError as E:
+      check (E.msg == "len(leftChildNodeHash) == 32 ") or (E.msg == "len(rightChildNodeHash) == 32 ")
+    except:
+      doAssert(false)
+
+const
+  leafData = [
+    ("\x03\x04\x05", "\x02\x03\x04\x05"),
+    ("", None)
+  ]
+
+test "binary trie leaf node encode":
+  for c in leafData:
+    try:
+      check b(c[1]) == encodeLeafNode(toBytesRange(c[0]))
+    except ValidationError as E:
+      discard
+    except:
+      doAssert(false)

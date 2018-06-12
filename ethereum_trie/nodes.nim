@@ -1,5 +1,5 @@
 import
-  rlp/types as rlpTypes, utils/binaries, types
+  rlp/types as rlpTypes, utils/binaries, types, sequtils
 
 type
   TrieNodeKind* = enum
@@ -53,29 +53,22 @@ proc parseNode*(node: BytesRange): TrieNode =
   else:
     raise newException(InvalidNode, "Unable to parse node")
 
-proc encodeKVNode*(keyPath: Bytes, childNodeHash: KeccakHash): Bytes =
+proc encodeKVNode*(keyPath: Bytes, childNodeHash: Bytes): Bytes =
   ## Serializes a key/value node
 
   if keyPath.len == 0:
     raise newException(ValidationError, "Key path can not be empty")
-  assert(childNodeHash.data.len == 32)
+  assert(childNodeHash.len == 32)
 
   let encodedKey = encodeFromBinKeypath(keyPath.toRange)
-  let encodedKeyLen = encodedKey.len
-  result = newSeq[byte](encodedKeyLen + 33)
-  result[0] = KV_TYPE.byte
-  copyMem(result[1].addr, encodedKey[0].unsafeAddr, encodedKeyLen)
-  copyMem(result[1 + encodedKeyLen].addr, childNodeHash.data[0].unsafeAddr, 32)
+  result = @[KV_TYPE.byte].concat(encodedKey, childNodeHash)
 
-proc encodeBranchNode*(leftChildNodeHash, rightChildNodeHash: KeccakHash): Bytes =
+proc encodeBranchNode*(leftChildNodeHash, rightChildNodeHash: Bytes): Bytes =
   ## Serializes a branch node
 
-  assert(leftChildNodeHash.data.len == 32)
-  assert(rightChildNodeHash.data.len == 32)
-  result = newSeq[byte](65)
-  result[0] = BRANCH_TYPE.byte
-  copyMem(result[1].addr, leftChildNodeHash.data[0].unsafeAddr, 32)
-  copyMem(result[33].addr, rightChildNodeHash.data[0].unsafeAddr, 32)
+  assert(leftChildNodeHash.len == 32)
+  assert(rightChildNodeHash.len == 32)
+  result = @[BRANCH_TYPE.byte].concat(leftChildNodeHash, rightChildNodeHash)
 
 proc encodeLeafNode*(value: BytesRange): Bytes =
   ## Serializes a leaf node

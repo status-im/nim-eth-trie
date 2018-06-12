@@ -19,3 +19,9 @@ proc b*(str: string): Bytes =
   result = newSeq[byte](str.len)
   for i in 0..<str.len:
     result[i] = byte(str[i])
+
+proc toBytesRange*[T](data: seq[T]): BytesRange =
+  var s = newSeq[byte](data.len)
+  for i in 0..<data.len:
+    s[i] = byte(data[i])
+  result = toRange(s)
