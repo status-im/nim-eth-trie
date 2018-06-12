@@ -1,8 +1,8 @@
 version: '{build}'
 
 cache:
-- x86_64-5.4.0-release-win32-seh-rt_v4-rev4.7z
-- i686-5.4.0-release-win32-dwarf-rt_v4-rev4.7z
+- x86_64-7.3.0-release-win32-seh-rt_v5-rev0.7z
+- i686-7.3.0-release-win32-dwarf-rt_v5-rev0.7z
 
 # We always want 32 and 64-bit compilation
 matrix:
@@ -12,12 +12,12 @@ environment:
 
   matrix:
     - MINGW_DIR: mingw32
-      MINGW_URL: https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/5.4.0/threads-win32/dwarf/i686-5.4.0-release-win32-dwarf-rt_v4-rev4.7z/download
-      MINGW_ARCHIVE: i686-5.4.0-release-win32-dwarf-rt_v4-rev4.7z
+      MINGW_URL: https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/7.3.0/threads-win32/seh/x86_64-7.3.0-release-win32-seh-rt_v5-rev0.7z/download
+      MINGW_ARCHIVE: x86_64-7.3.0-release-win32-seh-rt_v5-rev0.7z
       platform: x86
     - MINGW_DIR: mingw64
-      MINGW_URL: https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/5.4.0/threads-win32/seh/x86_64-5.4.0-release-win32-seh-rt_v4-rev4.7z/download
-      MINGW_ARCHIVE: x86_64-5.4.0-release-win32-seh-rt_v4-rev4.7z
+      MINGW_URL: https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/7.3.0/threads-win32/dwarf/i686-7.3.0-release-win32-dwarf-rt_v5-rev0.7z/download
+      MINGW_ARCHIVE: i686-7.3.0-release-win32-dwarf-rt_v5-rev0.7z
       platform: x64
 
 install:

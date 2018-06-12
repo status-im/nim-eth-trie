@@ -52,9 +52,11 @@ encode the path using binary encoding, the scheme looks like this table below.
 |--------|--------------------------|
 | xxxx   | nibble of binary keypath in bits, 0 = left, 1 = right|
 | yyyy   | nibble contains 0-3 bits padding + binary keypath |
-| mm     | number of padding bits |
+| mm     | number of binary keypath bits modulo 4 (0-3) |
 | 00     | zero zero prefix |
 | 1000   | even numbered nibbles prefix |
+
+if there is no padding, then yyyy bit sequence is absent, mm also zero. mm bits + padding bits must be 4 bits length.
 
 [nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie

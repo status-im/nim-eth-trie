@@ -13,7 +13,7 @@ func generateMask(): array[8, byte] {.compileTime.} =
 
 const
   byteMask = generateMask()
-  TWO_BITS = ["\x00\x00", "\x00\x01", "\x01\x00", "\x11\x11"]
+  TWO_BITS = ["\x00\x00", "\x00\x01", "\x01\x00", "\x01\x01"]
   PREFIX_00 = "\x00\x00"
   PREFIX_100000 = "\x01\x00\x00\x00\x00\x00"
 
@@ -59,28 +59,19 @@ proc encodeFromBinKeypath*(bin: BinVector): Bytes =
     let prefixVal = PREFIX_100000 & prefix & padding
     return decodeFromBin(concat(prefixVal, bin))
 
-func cmp[T](a: Bytes, b: T): bool =
-  if a.len != b.len: return false
-  for i in 0..<a.len:
-    if a[i].byte != b[i].byte: return false
-  true
-
-func index[T](a: openArray[T], b: Bytes): int =
-  result = -1
-  for i in 0..<a.len:
-    if cmp(b, a[i]): return i
-
-func decodeToBinKeypath*(path: BytesRange): Bytes =
-  # Decodes bytes into a sequence of 0s and 1s
-  # Used in decoding key path of a KV-NODE
+proc decodeToBinKeypath*(path: BytesRange): Bytes =
+  ## Decodes bytes into a sequence of 0s and 1s
+  ## Used in decoding key path of a KV-NODE
   var path = encodeToBin(path)
   if path[0] == binaryOne:
     path = path[4..^1]
 
-  assert path[0..<2].cmp(PREFIX_00)
-  let paddedLen = TWO_BITS.index(path[2..<4])
+  assert path[0] == binaryZero
+  assert path[1] == binaryZero
+  var bits = path[2].int shl 1
+  bits = bits or path[3].int
+
   if path.len > 4:
-    result = path[4+((4 - paddedLen) mod 4)..^1]
+    result = path[4+((4 - bits) mod 4)..^1]
   else:
     result = @[]
-

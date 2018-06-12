@@ -22,17 +22,16 @@ test "basic_test":
   check(asc == b("ASCII"))
 
 test "test_full_8bit":
-  for i in 0..<1024:
+  for i in 0..1024:
     let ori = generateBytes(i)
     let bin = ori.encodeToBin()
     let res = bin.decodeFromBin().toRange
     check(ori == res)
 
-#test "test_keypath_encoding":
-#    let i = 1023
-#    var value = generateRandomZeroOne(i)
-#    echo value.len
-#    var bk = encodeFromBinKeypath(value.toRange)
-#    var res = decodeToBinKeypath(bk.toRange)
-#    check(res.len == value.len)
-#    #check(res == value)
+test "test_keypath_encoding":
+  for i in 0..1024:
+    var value = generateRandomZeroOne(i)
+    var bk = encodeFromBinKeypath(value.toRange)
+    var res = decodeToBinKeypath(bk.toRange)
+    check(res.len == value.len)
+    check(res == value)
