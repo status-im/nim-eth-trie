@@ -1,8 +1,8 @@
 import
-  keccak_tiny, rlp/types
+  nimcrypto/hash, rlp/types
 
 type
-  KeccakHash* = Hash[256]
+  KeccakHash* = MDigest[256]
 
   TrieDatabase* = concept DB
     mixin put, del, get

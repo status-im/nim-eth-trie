@@ -1,8 +1,8 @@
 import
-  keccak_tiny, types, utils/binaries, nodes, rlp/types as rlpTypes, utils
+  nimcrypto/[keccak, hash], types, utils/binaries, nodes, rlp/types as rlpTypes, utils
 
 export
-  types
+  types, keccak, hash
 
 type
   BinaryTrie[DB: TrieDatabase] = object
@@ -27,8 +27,8 @@ proc initBinaryTrie*[DB](db: ref DB): BinaryTrie[DB] =
   result.dbLink = db
   result.rootHash = BLANK_HASH
 
-proc queryDB(self: BinaryTrie, nodeHash: BytesRange): BytesRange =
-  self.dbLink[].get(nodeHash.toHash).toRange
+template queryDB(self: BinaryTrie, nodeHash: BytesRange): BytesRange =
+  self.dbLink[].get(toHash(nodeHash)).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: BytesRange, keyPath: BinVector): BytesRange =
   # Empty trie
@@ -60,7 +60,7 @@ proc get*(self: BinaryTrie, key: BytesRange): BytesRange =
   return self.getAux(self.rootHash, encodeToBin(key).toRange)
 
 proc hashAndSave(self: BinaryTrie, node: BytesRange|Bytes): BytesRange =
-  let nodeHash = keccak_256(node.toMemRange)
+  let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
   discard self.dbLink[].put(nodeHash, node)
   result = nodeHash.toBytesRange
 
