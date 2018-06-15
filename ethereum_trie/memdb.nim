@@ -20,6 +20,9 @@ proc del*(db: var MemDB, key: KeccakHash): bool =
   else:
     return false
 
+proc contains*(db: MemDB, key: KeccakHash): bool =
+  db.tbl.hasKey(key)
+
 proc toSeq(r: BytesRange): Bytes {.used.} =
   newSeq(result, r.len)
   for i in 0 ..< r.len:
@@ -41,6 +44,7 @@ proc newMemDB*: ref MemDB =
 proc `$`*(db: MemDB): string =
   for k, v in db.tbl:
     echo k, " -> ", v
+
 static:
   assert MemDB is TrieDatabase
 

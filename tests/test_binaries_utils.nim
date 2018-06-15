@@ -36,4 +36,4 @@ suite "binaries utils":
       var bk = encodeFromBinKeypath(value.toRange)
       var res = decodeToBinKeypath(bk.toRange)
       check(res.len == value.len)
-    check(res == value)
+      check(res == value)
