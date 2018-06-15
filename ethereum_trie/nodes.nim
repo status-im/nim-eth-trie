@@ -1,5 +1,6 @@
 import
-  rlp/types as rlpTypes, utils/binaries, types, sequtils
+  rlp/types as rlpTypes, utils/binaries, types, sequtils,
+  ranges/ptr_arith
 
 type
   TrieNodeKind* = enum
@@ -7,14 +8,16 @@ type
     BRANCH_TYPE = 1
     LEAF_TYPE = 2
 
+  TrieNodeKey* = BytesRange
+
   TrieNode* = object
     case kind*: TrieNodeKind
     of KV_TYPE:
-      keyPath*: BytesRange
-      child*: BytesRange
+      keyPath*: Bytes
+      child*: TrieNodeKey
     of BRANCH_TYPE:
-      leftChild*: BytesRange
-      rightChild*: BytesRange
+      leftChild*: TrieNodeKey
+      rightChild*: TrieNodeKey
     of LEAF_TYPE:
       value*: BytesRange
 
@@ -44,7 +47,7 @@ proc parseNode*(node: BytesRange): TrieNode =
     if node.len <= 33:
       raise newException(InvalidNode, "Invalid kv node, short of key path or child node hash")
     # Output: node type, keypath, child
-    return TrieNode(kind: KV_TYPE, keyPath: decodeToBinKeypath(node[1..^33]).toRange, child: node[^32..^1])
+    return TrieNode(kind: KV_TYPE, keyPath: decodeToBinKeypath(node[1..^33]), child: node[^32..^1])
   of LEAF_TYPE:
     if node.len == 1:
       raise newException(InvalidNode, "Invalid leaf node, can not contain empty value")
@@ -53,31 +56,40 @@ proc parseNode*(node: BytesRange): TrieNode =
   else:
     raise newException(InvalidNode, "Unable to parse node")
 
-proc encodeKVNode*(keyPath, childNodeHash: BytesRange | Bytes): Bytes =
+proc encodeKVNode*(keyPath: Bytes, childHash: TrieNodeKey): Bytes =
   ## Serializes a key/value node
+  const
+    KV_TYPE_PREFIX = @[KV_TYPE.byte]
 
   if keyPath.len == 0:
     raise newException(ValidationError, "Key path can not be empty")
-  assert(childNodeHash.len == 32)
+
+  assert(childHash.len == 32)
 
   let encodedKey = encodeFromBinKeypath(keyPath.toRange)
-  result = @[KV_TYPE.byte].concat(encodedKey, childNodeHash)
+  result = KV_TYPE_PREFIX.concat(encodedKey, childHash)
 
-proc encodeBranchNode*(leftChildNodeHash, rightChildNodeHash: BytesRange | Bytes): Bytes =
+proc encodeBranchNode*(leftChildHash, rightChildHash: TrieNodeKey): Bytes =
   ## Serializes a branch node
+  const
+    BRANCH_TYPE_PREFIX = @[BRANCH_TYPE.byte]
 
-  assert(leftChildNodeHash.len == 32)
-  assert(rightChildNodeHash.len == 32)
-  result = @[BRANCH_TYPE.byte].concat(leftChildNodeHash, rightChildNodeHash)
+  assert(leftChildHash.len == 32)
+  assert(rightChildHash.len == 32)
+
+  result = BRANCH_TYPE_PREFIX.concat(leftChildHash, rightChildHash)
 
 proc encodeLeafNode*(value: BytesRange | Bytes): Bytes =
   ## Serializes a leaf node
+  const
+    LEAF_TYPE_PREFIX = @[LEAF_TYPE.byte]
 
   if value.len == 0:
     raise newException(ValidationError, "Value of leaf node can not be empty")
-  result = @[LEAF_TYPE.byte].concat(value)
 
-proc getCommonPrefixLength*(a, b: BytesRange): int =
+  result = LEAF_TYPE_PREFIX.concat(value)
+
+proc getCommonPrefixLength*(a, b: Bytes): int =
   let len = min(a.len, b.len)
   for i in 0..<len:
     if a[i] != b[i]: return i
