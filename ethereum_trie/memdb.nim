@@ -38,6 +38,9 @@ proc newMemDB*: ref MemDB =
   result = new(ref MemDB)
   result.tbl = initTable[KeccakHash, Bytes]()
 
+proc `$`*(db: MemDB): string =
+  for k, v in db.tbl:
+    echo k, " -> ", v
 static:
   assert MemDB is TrieDatabase
 

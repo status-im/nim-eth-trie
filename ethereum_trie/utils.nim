@@ -28,5 +28,3 @@ proc hashFromHex*(bits: static[int], input: string): MDigest[bits] =
 "The input string contains invalid characters")
 
 template hashFromHex*(s: static[string]): untyped = hashFromHex(s.len * 4, s)
-
-template baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
