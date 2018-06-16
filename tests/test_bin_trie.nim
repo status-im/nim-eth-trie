@@ -68,18 +68,18 @@ suite "binary trie":
         let y = toRange(c.value)
         check y == x
 
-      check result == BLANK_HASH or trie.rootHash == result
-      result = trie.rootHash
+      check result == BLANK_HASH or trie.getRootHash() == result
+      result = trie.getRootHash()
 
       # insert already exist key/value
       trie.set(kv_pairs[0].key, kv_pairs[0].value)
-      check trie.rootHash == result
+      check trie.getRootHash() == result
 
       # Delete all key/value
       random.shuffle(kv_pairs)
       for c in kv_pairs:
         trie.delete(c.key)
-      check trie.rootHash == BLANK_HASH
+      check trie.getRootHash() == BLANK_HASH
 
   const delSubtrieData = [
     (("\x12\x34\x56\x78", "78"), ("\x12\x34\x56\x79", "79"), "\x12\x34\x56", true, false),
@@ -109,7 +109,7 @@ suite "binary trie":
         trie.deleteSubtrie(key_to_be_deleted)
         check trie.get(kv1[0]) == zeroBytesRange
         check trie.get(kv2[0]) == zeroBytesRange
-        check trie.rootHash == BLANK_HASH
+        check trie.getRootHash() == BLANK_HASH
       else:
         if will_raise_error:
           try:
@@ -117,13 +117,13 @@ suite "binary trie":
           except NodeOverrideError as E:
             discard
           except:
-            doAssert(false)
+            check(false)
         else:
-          let root_hash_before_delete = trie.rootHash
+          let root_hash_before_delete = trie.getRootHash()
           trie.deleteSubtrie(key_to_be_deleted)
           check trie.get(kv1[0]) == toRange(kv1[1])
           check trie.get(kv2[0]) == toRange(kv2[1])
-          check trie.rootHash == root_hash_before_delete
+          check trie.getRootHash() == root_hash_before_delete
 
   const invalidKeyData = [
     ("\x12\x34\x56", false),
@@ -152,11 +152,11 @@ suite "binary trie":
         except NodeOverrideError as E:
           discard
         except:
-          doAssert(false)
+          check(false)
       else:
-        let previous_root_hash = trie.rootHash
+        let previous_root_hash = trie.getRootHash()
         trie.delete(invalidKey)
-        check previous_root_hash == trie.rootHash
+        check previous_root_hash == trie.getRootHash()
 
   test "update value":
     let keys = randList(string, randGen(32, 32), randGen(100, 100))
@@ -166,11 +166,11 @@ suite "binary trie":
     for key in keys:
       trie.set(key, "old")
 
-    var current_root = trie.rootHash
+    var current_root = trie.getRootHash()
     for i in vals:
       trie.set(keys[i], "old")
-      check current_root == trie.rootHash
+      check current_root == trie.getRootHash()
       trie.set(keys[i], "new")
-      check current_root != trie.rootHash
+      check current_root != trie.getRootHash()
       check trie.get(keys[i]) == toRange("new")
-      current_root = trie.rootHash
+      current_root = trie.getRootHash()

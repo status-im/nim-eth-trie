@@ -1,10 +1,14 @@
 import
-  binary, utils/binaries, nodes, rlp/types
+  binary, utils/binaries, nodes, rlp/types,
+  nimcrypto/[keccak, hash], memdb
+
+type
+  InvalidKeyError* = object of Exception
 
 template query[DB](db: ref DB, nodeHash: TrieNodeKey): BytesRange =
   db[].get(toHash(nodeHash)).toRange
 
-proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: BytesRange; keyPrefix: BytesRange): bool =
+proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitVector): bool =
   if nodeHash == BLANK_HASH:
     return false
 
@@ -21,23 +25,23 @@ proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: BytesRange; keyPrefix: Byt
       return false
     else:
       if keyPrefix[0..<node.keyPath.len] == node.keyPath:
-        return checkIfBranchExistImpl(db, node.child, keyPrefix[node.keyPath.len..^1])
+        return checkIfBranchExistImpl(db, node.child, keyPrefix.sliceToEnd(node.keyPath.len))
       return false
   of BRANCH_TYPE:
     if keyPrefix.len == 0: return true
     if keyPrefix[0] == binaryZero:
-      return checkIfBranchExistImpl(db, node.leftChild, keyPrefix[1..^1])
+      return checkIfBranchExistImpl(db, node.leftChild, keyPrefix.sliceToEnd(1))
     else:
-      return checkIfBranchExistImpl(db, node.rightChild, keyPrefix[1..^1])
+      return checkIfBranchExistImpl(db, node.rightChild, keyPrefix.sliceToEnd(1))
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc checkIfBranchExist*[DB](db: ref DB; rootHash: BytesRange; keyPrefix: BytesRange): bool =
+proc checkIfBranchExist*[DB](db: ref DB; rootHash: TrieNodeKey; keyPrefix: BytesRange): bool =
   ## Given a key prefix, return whether this prefix is
   ## the prefix of an existing key in the trie.
   checkIfBranchExistImpl(db, rootHash, encodeToBin(keyPrefix).toRange)
 
-proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: BytesRange, output: var seq[BytesRange]) =
+proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: TrieBitVector, output: var seq[BytesRange]) =
   if nodeHash == BLANK_HASH: return
 
   let nodeVal = db.query(nodeHash)
@@ -55,8 +59,9 @@ proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: BytesRange, output: var se
       raise newException(InvalidKeyError, "Key too short")
 
     output.add nodeVal
-    if keyPath[0..<node.keyPath.len] == node.keyPath:
-      getBranchImpl(db, node.child, keyPath[node.keyPath.len..^1], output)
+    let sliceLen = min(keyPath.len, node.keyPath.len)
+    if keyPath[0..<sliceLen] == node.keyPath:
+      getBranchImpl(db, node.child, keyPath.sliceToEnd(sliceLen), output)
 
   of BRANCH_TYPE:
     if keyPath.len == 0:
@@ -64,58 +69,66 @@ proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: BytesRange, output: var se
 
     output.add nodeVal
     if keyPath[0] == binaryZero:
-      getBranchImpl(db, node.leftChild, keyPath[1..^1], output)
+      getBranchImpl(db, node.leftChild, keyPath.sliceToEnd(1), output)
     else:
-      getBranchImpl(db, node.rightChild, keyPath[1..^1], output)
+      getBranchImpl(db, node.rightChild, keyPath.sliceToEnd(1), output)
 
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getBranch*[DB](db: ref DB; rootHash: BytesRange; key: BytesRange): seq[BytesRange] =
+proc getBranch*[DB](db: ref DB; rootHash: TrieNodeKey; key: BytesRange): seq[BytesRange] =
   ##     Get a long-format Merkle branch
   result = @[]
   getBranchImpl(db, rootHash, encodeToBin(key).toRange, result)
 
+proc isValidBranch*(branch: seq[BytesRange], rootHash: TrieNodeKey, key, value: BytesRange): bool =
+  # branch must not be empty
+  assert(branch.len != 0)
 
-proc getTrieNodesImpl[DB](db: ref DB; nodeHash: BytesRange, output: var seq[BytesRange]) =
+  var db = newMemDB()
+  for node in branch:
+    assert(node.len != 0)
+    let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
+    discard db[].put(nodeHash, node)
+
+  var trie = initBinaryTrie(db, rootHash)
+  result = trie.get(key) == value
+
+proc getTrieNodesImpl[DB](db: ref DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]): bool =
   ## Get full trie of a given root node
 
   var nodeVal: BytesRange
-  if nodeHash in db[]:
+  if toHash(nodeHash) in db[]:
     nodeVal = db.query(nodeHash)
   else:
-    return
+    return false
 
   let node = parseNode(nodeVal)
 
   case node.kind
   of KV_TYPE:
     output.add nodeVal
-    getTrieNodesImpl(db, node.child, output)
+    result = getTrieNodesImpl(db, node.child, output)
   of BRANCH_TYPE:
     output.add nodeVal
-    getTrieNodesImpl(db, node.leftChild, output)
-    getTrieNodesImpl(db, node.rightChild, output)
+    result = getTrieNodesImpl(db, node.leftChild, output)
+    result = getTrieNodesImpl(db, node.rightChild, output)
   of LEAF_TYPE:
     output.add nodeVal
   else:
-    raise Exception("Invariant: unreachable code path")
+    raise newException(Exception, "Invariant: unreachable code path")
 
-proc getTrieNodes*[DB](db: ref DB; nodeHash: BytesRange): seq[BytesRange] =
+proc getTrieNodes*[DB](db: ref DB; nodeHash: TrieNodeKey): seq[BytesRange] =
   result = @[]
-  getTrieNodesImpl(db, nodeHash, result)
+  discard getTrieNodesImpl(db, nodeHash, result)
 
-proc getWitnessImpl*[DB](db: ref DB; nodeHash: BytesRange; keyPath: BytesRange; output: var seq[BytesRange]) =
-  proc startsWith(a, b: BytesRange): bool =
-    if b.len > a.len: return false
-    result = a[0..<b.len] == b
-    
+proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVector; output: var seq[BytesRange]) =
   if keyPath.len == 0:
-    getTrieNodesImpl(db, nodeHash, output)
+    if not getTrieNodesImpl(db, nodeHash, output): return
 
   var nodeVal: BytesRange
-  if nodeHash in db[]:
-    nodeVal = db[nodeHash]
+  if toHash(nodeHash) in db[]:
+    nodeVal = db.query(nodeHash)
   else:
     return
 
@@ -126,20 +139,17 @@ proc getWitnessImpl*[DB](db: ref DB; nodeHash: BytesRange; keyPath: BytesRange; 
     if keyPath.len != 0:
       raise newException(InvalidKeyError, "Key too long")
   of KV_TYPE:
-    if node.keyPath.startsWith(keyPath):
-      output.add nodeVal
-      getTrieNodesImpl(db, node.child, output)
-    elif keyPath.startsWith(node.keyPath):
-      output.add nodeVal
-      getWitnessImpl(db, node.child, keyPath[node.keyPath.len..^1], output)
-    else:
-      output.add nodeVal
+    output.add nodeVal
+    if keyPath.len < node.keyPath.len and node.keyPath[0..<keyPath.len] == keypath:
+      if not getTrieNodesImpl(db, node.child, output): return
+    elif keyPath[0..<node.keyPath.len] == node.keyPath:
+      getWitnessImpl(db, node.child, keyPath.sliceToEnd(node.keyPath.len), output)
   of BRANCH_TYPE:
     output.add nodeVal
-    if keyPath[0] == 0.char:
-      getWitnessImpl(db, node.leftChild, keyPath[1..^1], output)
+    if keyPath[0] == binaryZero:
+      getWitnessImpl(db, node.leftChild, keyPath.sliceToEnd(1), output)
     else:
-      getWitnessImpl(db, node.rightChild, keyPath[1..^1], output)
+      getWitnessImpl(db, node.rightChild, keyPath.sliceToEnd(1), output)
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 

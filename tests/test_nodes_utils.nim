@@ -106,10 +106,10 @@ suite "binary trie nodes utils":
       let kind = TrieNodeKind(node[0])
       try:
         let res = parseNode(input)
-        doAssert(kind == res.kind)
+        check(kind == res.kind)
         case res.kind
         of KV_TYPE:
-          check(res.keyPath == b(node[1]))
+          check(res.keyPath == toBytesRange(node[1]))
           check(res.child == toBytesRange(node[2]))
         of BRANCH_TYPE:
           check(res.leftChild == toBytesRange(node[2]))
@@ -120,7 +120,7 @@ suite "binary trie nodes utils":
         discard
       except:
         echo getCurrentExceptionMsg()
-        doAssert(false)
+        check(false)
       inc x
 
   const
@@ -166,7 +166,7 @@ suite "binary trie nodes utils":
       except AssertionError as E:
         check (E.msg == "len(leftChildHash) == 32 ") or (E.msg == "len(rightChildHash) == 32 ")
       except:
-        doAssert(false)
+        check(false)
 
   const
     leafData = [
@@ -181,4 +181,4 @@ suite "binary trie nodes utils":
       except ValidationError as E:
         discard
       except:
-        doAssert(false)
+        check(false)

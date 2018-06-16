@@ -18,7 +18,7 @@ suite "binaries utils":
 
   test "basic":
     let binbin = parseBin("0100000101010011010000110100100101001001")
-    check(encodeToBin(br("ASCII")) == binbin)
+    check(encodeToBin(br("ASCII")) == toRange(binbin))
 
     let asc = decodeFromBin(binbin)
     check(asc == b("ASCII"))
@@ -27,8 +27,8 @@ suite "binaries utils":
     for i in 0..1024:
       let ori = generateBytes(i)
       let bin = ori.encodeToBin()
-      let res = bin.decodeFromBin().toRange
-      check(ori == res)
+      let res = decodeFromBin(bin.toSeq)
+      check(ori == res.toRange)
 
   test "keypath encoding":
     for i in 0..1024:
@@ -36,4 +36,4 @@ suite "binaries utils":
       var bk = encodeFromBinKeypath(value.toRange)
       var res = decodeToBinKeypath(bk.toRange)
       check(res.len == value.len)
-      check(res == value)
+      check(res == value.toRange)

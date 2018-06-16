@@ -13,7 +13,7 @@ type
   TrieNode* = object
     case kind*: TrieNodeKind
     of KV_TYPE:
-      keyPath*: Bytes
+      keyPath*: TrieBitVector
       child*: TrieNodeKey
     of BRANCH_TYPE:
       leftChild*: TrieNodeKey
@@ -56,7 +56,7 @@ proc parseNode*(node: BytesRange): TrieNode =
   else:
     raise newException(InvalidNode, "Unable to parse node")
 
-proc encodeKVNode*(keyPath: Bytes, childHash: TrieNodeKey): Bytes =
+proc encodeKVNode*(keyPath: TrieBitVector | Bytes, childHash: TrieNodeKey): Bytes =
   ## Serializes a key/value node
   const
     KV_TYPE_PREFIX = @[KV_TYPE.byte]
@@ -89,7 +89,7 @@ proc encodeLeafNode*(value: BytesRange | Bytes): Bytes =
 
   result = LEAF_TYPE_PREFIX.concat(value)
 
-proc getCommonPrefixLength*(a, b: Bytes): int =
+proc getCommonPrefixLength*(a, b: Bytes | TrieBitVector): int =
   let len = min(a.len, b.len)
   for i in 0..<len:
     if a[i] != b[i]: return i
