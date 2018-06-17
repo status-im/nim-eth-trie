@@ -56,7 +56,8 @@ encode the path using binary encoding, the scheme looks like this table below.
 | 00     | zero zero prefix |
 | 1000   | even numbered nibbles prefix |
 
-if there is no padding, then yyyy bit sequence is absent, mm also zero. mm bits + padding bits must be 4 bits length.
+if there is no padding, then yyyy bit sequence is absent, mm also zero.
+mm bits + padding bits must be 4 bits length.
 
 ### The API
 
@@ -64,9 +65,10 @@ The primary API for Binary-trie is `set` and `get`.
 * set(key, value)  ---  _store a value associated with a key_
 * get(key): value  --- _get a value using a key_
 
-Both `key` and `value` are of `BytesRange` type.
-But you can also use convenience API `get` and `set` which accepts
-`Bytes` or `string` (a `string` is conceptually wrong and may costly, but it is good for testing purpose).
+Both `key` and `value` are of `BytesRange` type. And they cannot have zero length.
+You can also use convenience API `get` and `set` which accepts
+`Bytes` or `string` (a `string` is conceptually wrong in this context
+and may costlier than a `BytesRange`, but it is good for testing purpose).
 
 Binary-trie also provide dictionary syntax for `set` and `get`.
 * trie[key] = value -- same as `set`
@@ -84,8 +86,13 @@ Additional APIs are:
  * getDB(): `ref DB` -- get flat-db pointer
 
 Constructor API:
-  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash have `BytesRange` type
+  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash has `BytesRange` type
   * init(BinaryTrie[DB], ref DB, rootHash[optional])
+
+Normally you would not set the rootHash when constructing an empty Binary-trie.
+Setting the rootHash occured in a scenario where you have a populated DB
+with existing trie structure and you know the rootHash,
+and then you want to continue/resume the trie operations.
 
 ## Examples
 
@@ -109,6 +116,22 @@ trie["moon"] = "sun"
 assert "moon" in trie
 assert trie["moon"] == "sun".toRange
 ```
+
+Remember, `set` and `get` are trie operations. A single `set` operation may invoke
+more than one store operation into the underlying DB. The same is also happened to `get` operation,
+it could do more than one flat-db lookup before it return the requested value.
+
+## The truth behind a lie
+
+What kind of lie? actually, `delete` and `deleteSubtrie` doesn't remove the
+'deleted' node from the underlying DB. It only make the node inaccessible
+from the user of the trie. The same also happened if you update the value of a key,
+the old value node is not removed from the underlying DB.
+You may think that is a waste of storage space.
+Luckily, we also provide some utilities to deal with this situation, the branch utils.
+
+## The branch utils
+
 
 [nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie
