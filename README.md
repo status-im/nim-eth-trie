@@ -12,7 +12,7 @@ Nim Implementation of the Ethereum Trie structure
 Binary-trie is a dictionary-like data structure to store key-value pair.
 Much like it's sibling Hexary-trie, the key-value pair will be stored into key-value flat-db.
 The primary difference with Hexary-trie is, each node of Binary-trie only consist of one or two child,
-while Hexary-trie node can contains up to 16 child-node.
+while Hexary-trie node can contains up to 16 or 17 child-nodes.
 
 Unlike Hexary-trie, Binary-trie store it's data into flat-db without using rlp encoding.
 Binary-trie store its value using simple **Node-Types** encoding.
@@ -57,6 +57,58 @@ encode the path using binary encoding, the scheme looks like this table below.
 | 1000   | even numbered nibbles prefix |
 
 if there is no padding, then yyyy bit sequence is absent, mm also zero. mm bits + padding bits must be 4 bits length.
+
+### The API
+
+The primary API for Binary-trie is `set` and `get`.
+* set(key, value)  ---  _store a value associated with a key_
+* get(key): value  --- _get a value using a key_
+
+Both `key` and `value` are of `BytesRange` type.
+But you can also use convenience API `get` and `set` which accepts
+`Bytes` or `string` (a `string` is conceptually wrong and may costly, but it is good for testing purpose).
+
+Binary-trie also provide dictionary syntax for `set` and `get`.
+* trie[key] = value -- same as `set`
+* value = trie[key] -- same as `get`
+* contains(key) a.k.a. `in` operator
+
+Additional APIs are:
+ * exists(key) -- returns `bool`, to check key-value existence -- same as contains
+ * delete(key) -- remove a key-value from the trie
+ * deleteSubtrie(key) -- remove a key-value from the trie plus all of it's subtrie
+   that starts with the same key prefix
+ * rootNode() -- get root node
+ * rootNode(node) -- replace the root node
+ * getRootHash(): `KeccakHash` with `BytesRange` type
+ * getDB(): `ref DB` -- get flat-db pointer
+
+Constructor API:
+  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash have `BytesRange` type
+  * init(BinaryTrie[DB], ref DB, rootHash[optional])
+
+## Examples
+
+```Nim
+import
+  ethereum_trie/[memdb, binary, utils]
+
+var db = newMemDB()
+var trie = initBinaryTrie(db)
+trie.set("key1", "value1")
+trie.set("key2", "value2")
+assert trie.get("key1") == "value1".toRange
+assert trie.get("key2") == "value2".toRange
+
+# delete all subtrie with key prefixes "key"
+trie.deleteSubtrie("key")
+assert trie.get("key1") == zeroBytesRange
+assert trie.get("key2") == zeroBytesRange
+
+trie["moon"] = "sun"
+assert "moon" in trie
+assert trie["moon"] == "sun".toRange
+```
 
 [nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie

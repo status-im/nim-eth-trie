@@ -3,7 +3,7 @@ import
   rlp/types as rlpTypes, utils, ranges/ptr_arith
 
 export
-  types, keccak, hash
+  types, keccak, hash, rlpTypes
 
 type
   BinaryTrie*[DB: TrieDatabase] = object
@@ -293,6 +293,9 @@ template `[]=`*(self: BinaryTrie, key, value: Bytes | string) =
   self.set(toRange(key), toRange(value))
 
 template exists*(self: BinaryTrie, key: Bytes | string): bool =
+  self.get(toRange(key)) != zeroBytesRange
+
+template contains*(self: BinaryTrie, key: Bytes | string): bool =
   self.get(toRange(key)) != zeroBytesRange
 
 proc delete*(self: var BinaryTrie, key: Bytes | string) {.inline.} =
