@@ -36,9 +36,11 @@ proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: Tr
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc checkIfBranchExist*[DB](db: ref DB; rootHash: TrieNodeKey, keyPrefix: BytesContainer): bool =
+proc checkIfBranchExist*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash, keyPrefix: BytesContainer): bool =
   ## Given a key prefix, return whether this prefix is
   ## the prefix of an existing key in the trie.
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
   checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)).toRange)
 
 proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector, output: var seq[BytesRange]) =

@@ -136,8 +136,7 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitVector,
     return self.setBranchNode(keyPath, node, value, deleteSubtrie)
   raise newException(Exception, "Invariant: This shouldn't ever happen")
 
-# beware of Nim's bug #8059, generic typeclass param
-proc set*(self: var BinaryTrie, key, value: BytesContainer) {.inline.} =
+proc set*(self: var BinaryTrie, key, value: distinct BytesContainer) {.inline.} =
   ## Sets the value at the given keyPath from the given node
   ## Key will be encoded into binary array format first.
 
@@ -281,8 +280,7 @@ proc rootNode*(self: var BinaryTrie, node: BytesContainer) {.inline.} =
 template `[]`*(self: BinaryTrie, key: BytesContainer): BytesRange =
   self.get(key)
 
-# beware of Nim's bug #8059, generic typeclass param
-template `[]=`*(self: var BinaryTrie, key, value: BytesContainer) =
+template `[]=`*(self: var BinaryTrie, key, value: distinct BytesContainer) =
   self.set(key, value)
 
 template contains*(self: BinaryTrie, key: BytesContainer): bool =
