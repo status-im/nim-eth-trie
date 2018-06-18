@@ -41,7 +41,7 @@ proc checkIfBranchExist*[DB](db: ref DB; rootHash: TrieNodeKey, keyPrefix: Bytes
   ## the prefix of an existing key in the trie.
   checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)).toRange)
 
-proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: TrieBitVector, output: var seq[BytesRange]) =
+proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector, output: var seq[BytesRange]) =
   if nodeHash == BLANK_HASH: return
 
   let nodeVal = db.query(nodeHash)
@@ -76,12 +76,17 @@ proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: TrieBitVector, output: var
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getBranch*[DB](db: ref DB; rootHash: BytesContainer; key: BytesContainer): seq[BytesRange] =
+proc getBranch*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##     Get a long-format Merkle branch
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
   result = @[]
   getBranchImpl(db, toRange(rootHash), encodeToBin(toRange(key)).toRange, result)
 
-proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer, key, value: BytesContainer): bool =
+proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
+
   # branch must not be empty
   assert(branch.len != 0)
 
@@ -119,6 +124,8 @@ proc getTrieNodesImpl[DB](db: ref DB; nodeHash: TrieNodeKey, output: var seq[Byt
     raise newException(Exception, "Invariant: unreachable code path")
 
 proc getTrieNodes*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash): seq[BytesRange] =
+  when nodeHash.type isnot KeccakHash:
+    assert(nodeHash.len == 32)
   result = @[]
   discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
@@ -153,11 +160,13 @@ proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVect
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getWitness*[DB](db: ref DB; nodeHash: BytesContainer; key: BytesContainer): seq[BytesRange] =
+proc getWitness*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##  Get all witness given a keyPath prefix.
   ##  Include
   ##
   ##  1. witness along the keyPath and
   ##  2. witness in the subtrie of the last node in keyPath
+  when nodeHash.type isnot KeccakHash:
+    assert(nodeHash.len == 32)
   result = @[]
   getWitnessImpl(db, toRange(nodeHash), encodeToBin(toRange(key)).toRange, result)
