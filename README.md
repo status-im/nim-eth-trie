@@ -128,7 +128,7 @@ What kind of lie? actually, `delete` and `deleteSubtrie` doesn't remove the
 from the user of the trie. The same also happened if you update the value of a key,
 the old value node is not removed from the underlying DB.
 A more subtle lie also happened when you add new entrie into the trie using `set` operation.
-the previous hash of affected branch become obsolete and replaced by new hash,
+The previous hash of affected branch become obsolete and replaced by new hash,
 the old hash become inaccessible to the user.
 You may think that is a waste of storage space.
 Luckily, we also provide some utilities to deal with this situation, the branch utils.
@@ -227,7 +227,7 @@ will return the whole trie, but only the accessible nodes.
 Then we can write the clean tree into a new DB instance to replace the old one.
 
 
-[nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
+[nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie
-[badge-nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie.svg?branch=master
+[badge-nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie.svg?branch=master
 [badge-nimtrie-appveyor]: https://ci.appveyor.com/api/projects/status/github/jarradh/nim-trie?svg=true
