@@ -140,6 +140,7 @@ The branch utils consist of these API:
  * getBranch(ref DB; rootHash; key): branch
  * isValidBranch(branch, rootHash, key, value): bool
  * getWitness(ref DB; nodeHash; key): branch
+ * getTrieNodes(ref DB; nodeHash): branch
 
 `keyPrefix`, `key`, and `value` are bytes container with length greater than zero.
 They can be BytesRange, Bytes, and string(again, for convenience and testing purpose).
@@ -210,6 +211,12 @@ branch = getWitness(db, trie.getRootHash(), "key") # this will include additiona
 
 branch = getWitness(db, trie.getRootHash(), "") # this will return the whole trie
 # ==> [A, B, C1, D1, C2, D2]
+
+var node = branch[1] # B
+let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
+var nodes = getTrieNodes(db, nodeHash)
+assert nodes.len == branchs.len - 1
+# ==> [B, C1, D1, C2, D2]
 ```
 
 ## Remember the lie?

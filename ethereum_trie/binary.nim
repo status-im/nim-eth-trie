@@ -22,6 +22,9 @@ proc toHash*(nodeHash: TrieNodeKey): KeccakHash =
   assert(nodeHash.len == 32)
   copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
 
+template toRange*(hash: KeccakHash): BytesRange =
+  toTrieNodeKey(hash)
+
 let
   BLANK_HASH*     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").toTrieNodeKey
   zeroBytesRange* = Range[byte]()

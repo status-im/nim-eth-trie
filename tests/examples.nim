@@ -1,5 +1,6 @@
 import
-  ethereum_trie/[memdb, binary, utils, branches]
+  ethereum_trie/[memdb, binary, utils, branches],
+  nimcrypto/[keccak, hash]
 
 var db = newMemDB()
 var trie = initBinaryTrie(db)
@@ -17,6 +18,11 @@ let beforeDeleteLen = db[].len
 var branchs = getWitness(db, trie.getRootHash, zeroBytesRange)
 # set operation create new intermediate entries
 assert branchs.len < beforeDeleteLen
+
+var node = branchs[1]
+let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
+var nodes = getTrieNodes(db, nodeHash)
+assert nodes.len == branchs.len - 1
 
 # delete all subtrie with key prefixes "key"
 trie.deleteSubtrie("key")

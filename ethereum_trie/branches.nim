@@ -118,8 +118,7 @@ proc getTrieNodesImpl[DB](db: ref DB; nodeHash: TrieNodeKey, output: var seq[Byt
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-# this actually used, but Nim report not used
-proc getTrieNodes[DB](db: ref DB; nodeHash: BytesContainer): seq[BytesRange] {.used.} =
+proc getTrieNodes*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash): seq[BytesRange] =
   result = @[]
   discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
