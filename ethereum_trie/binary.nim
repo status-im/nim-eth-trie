@@ -29,11 +29,13 @@ let
   BLANK_HASH*     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").toTrieNodeKey
   zeroBytesRange* = Range[byte]()
 
-proc init*[DB](x: typedesc[BinaryTrie[DB]], db: ref DB, rootHash = BLANK_HASH): BinaryTrie[DB] =
+proc init*[DB](x: typedesc[BinaryTrie[DB]], db: ref DB, rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
   result.dbLink = db
-  result.rootHash = rootHash
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
+  result.rootHash = toRange(rootHash)
 
-proc initBinaryTrie*[DB](db: ref DB, rootHash = BLANK_HASH): BinaryTrie[DB] =
+proc initBinaryTrie*[DB](db: ref DB, rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
   init(BinaryTrie[DB], db, rootHash)
 
 proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =

@@ -86,7 +86,7 @@ Additional APIs are:
  * getDB(): `ref DB` -- get flat-db pointer
 
 Constructor API:
-  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash has `BytesRange` type
+  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash has `BytesRange` or KeccakHash type
   * init(BinaryTrie[DB], ref DB, rootHash[optional])
 
 Normally you would not set the rootHash when constructing an empty Binary-trie.
@@ -150,7 +150,7 @@ but they have constraint: must be 32 bytes in length, and it must be a keccak_25
 
 `branch` is a list of nodes, or in this case a seq[BytesRange].
 A list? yes, the structure is stored along with the encoded node.
-Therefore a list is enough to reconstruct the entire trie.
+Therefore a list is enough to reconstruct the entire trie/branch.
 
 ```Nim
 import
@@ -192,7 +192,7 @@ var branchB = getBranch(db, trie.getRootHash(), "key2")
 # ==> [A, B, C2, D2]
 
 assert isValidBranch(branchA, trie.getRootHash(), "key1", "value1") == true
-assert isValidBranch(branchA, trie.getRootHash(), "key5", zeroBytesRange) == true
+assert isValidBranch(branchA, trie.getRootHash(), "key5", "") == true
 
 assert isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # Key Error
 
@@ -203,13 +203,16 @@ x = getBranch(db, trie.getRootHash(), "key123") # InvalidKeyError
 x = getBranch(db, trie.getRootHash(), "key5") # there is still branch for non-exist key
 # ==> [A]
 
-var branch = getWitness(db, trie.getRootHash(), "key1") # equivalent to `getBranch(db, trie.getRootHash(), "key1")`
+var branch = getWitness(db, trie.getRootHash(), "key1")
+# equivalent to `getBranch(db, trie.getRootHash(), "key1")`
 # ==> [A, B, C1, D1]
 
-branch = getWitness(db, trie.getRootHash(), "key") # this will include additional nodes of "key2"
+branch = getWitness(db, trie.getRootHash(), "key")
+# this will include additional nodes of "key2"
 # ==> [A, B, C1, D1, C2, D2]
 
-branch = getWitness(db, trie.getRootHash(), "") # this will return the whole trie
+branch = getWitness(db, trie.getRootHash(), "")
+# this will return the whole trie
 # ==> [A, B, C1, D1, C2, D2]
 
 var node = branch[1] # B
