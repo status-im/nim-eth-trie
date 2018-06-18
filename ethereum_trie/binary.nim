@@ -12,7 +12,7 @@ type
 
   NodeOverrideError* = object of Exception
 
-  BytesContainer = BytesRange | Bytes | string
+  BytesContainer* = BytesRange | Bytes | string
 
 proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
   result = newRange[byte](32)
