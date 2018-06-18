@@ -70,7 +70,7 @@ You can also use convenience API `get` and `set` which accepts
 `Bytes` or `string` (a `string` is conceptually wrong in this context
 and may costlier than a `BytesRange`, but it is good for testing purpose).
 
-Binary-trie also provide dictionary syntax for `set` and `get`.
+Binary-trie also provide dictionary syntax API for `set` and `get`.
 * trie[key] = value -- same as `set`
 * value = trie[key] -- same as `get`
 * contains(key) a.k.a. `in` operator
@@ -118,7 +118,7 @@ assert trie["moon"] == "sun".toRange
 ```
 
 Remember, `set` and `get` are trie operations. A single `set` operation may invoke
-more than one store operation into the underlying DB. The same is also happened to `get` operation,
+more than one store/lookup operation into the underlying DB. The same is also happened to `get` operation,
 it could do more than one flat-db lookup before it return the requested value.
 
 ## The truth behind a lie
@@ -127,10 +127,97 @@ What kind of lie? actually, `delete` and `deleteSubtrie` doesn't remove the
 'deleted' node from the underlying DB. It only make the node inaccessible
 from the user of the trie. The same also happened if you update the value of a key,
 the old value node is not removed from the underlying DB.
+A more subtle lie also happened when you add new entrie into the trie using `set` operation.
+the previous hash of affected branch become obsolete and replaced by new hash,
+the old hash become inaccessible to the user.
 You may think that is a waste of storage space.
 Luckily, we also provide some utilities to deal with this situation, the branch utils.
 
 ## The branch utils
+
+The branch utils consist of these API:
+ * checkIfBranchExist(ref DB; rootHash; keyPrefix): bool
+ * getBranch(ref DB; rootHash; key): branch
+ * isValidBranch(branch, rootHash, key, value): bool
+ * getWitness(ref DB; nodeHash; key): branch
+
+`keyPrefix`, `key`, and `value` are bytes container with length greater than zero.
+They can be BytesRange, Bytes, and string(again, for convenience and testing purpose).
+
+`rootHash` and `nodeHash` also bytes container,
+but they have constraint: must be 32 bytes in length, and it must be a keccak_256 hash value.
+
+`branch` is a list of nodes, or in this case a seq[BytesRange].
+A list? yes, the structure is stored along with the encoded node.
+Therefore a list is enough to reconstruct the entire trie.
+
+```Nim
+import
+  ethereum_trie/[memdb, binary, utils]
+
+var db = newMemDB()
+var trie = initBinaryTrie(db)
+trie.set("key1", "value1")
+trie.set("key2", "value2")
+
+assert checkIfBranchExist(db, trie.getRootHash(), "key") == true
+assert checkIfBranchExist(db, trie.getRootHash(), "key1") == true
+assert checkIfBranchExist(db, trie.getRootHash(), "ken") == false
+assert checkIfBranchExist(db, trie.getRootHash(), "key123") == false
+```
+
+The tree will looks like:
+```text
+    root --->  A(kvnode, *common key prefix*)
+                         |
+                         |
+                         |
+                    B(branchnode)
+                     /         \
+                    /           \
+                   /             \
+C1(kvnode, *remain kepath*) C2(kvnode, *remain kepath*)
+            |                           |
+            |                           |
+            |                           |
+  D1(leafnode, b'value1')       D2(leafnode, b'value2')
+```
+
+```Nim
+var branchA = getBranch(db, trie.getRootHash(), "key1")
+# ==> [A, B, C1, D1]
+
+var branchB = getBranch(db, trie.getRootHash(), "key2")
+# ==> [A, B, C2, D2]
+
+assert isValidBranch(branchA, trie.getRootHash(), "key1", "value1") == true
+assert isValidBranch(branchA, trie.getRootHash(), "key5", zeroBytesRange) == true
+
+assert isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # Key Error
+
+var x = getBranch(db, trie.getRootHash(), "key")
+# ==> [A]
+
+x = getBranch(db, trie.getRootHash(), "key123") # InvalidKeyError
+x = getBranch(db, trie.getRootHash(), "key5") # there is still branch for non-exist key
+# ==> [A]
+
+var branch = getWitness(db, trie.getRootHash(), "key1") # equivalent to `getBranch(db, trie.getRootHash(), "key1")`
+# ==> [A, B, C1, D1]
+
+branch = getWitness(db, trie.getRootHash(), "key") # this will include additional nodes of "key2"
+# ==> [A, B, C1, D1, C2, D2]
+
+branch = getWitness(db, trie.getRootHash(), "") # this will return the whole trie
+# ==> [A, B, C1, D1, C2, D2]
+```
+
+## Remember the lie?
+
+Because trie `delete`, `deleteSubtrie` and `set` operation create inaccessible nodes in the underlying DB,
+we need to remove them if necessary. We already see that `branch = getWitness(db, trie.getRootHash(), "")`
+will return the whole trie, but only the accessible nodes.
+Then we can write the clean tree into a new DB instance to replace the old one.
 
 
 [nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
