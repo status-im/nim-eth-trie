@@ -1,9 +1,9 @@
 import
-  nimcrypto/[keccak, hash], types, utils/binaries, nodes,
+  nimcrypto/[keccak, hash], types, bitvector, nodes,
   rlp/types as rlpTypes, utils, ranges/ptr_arith
 
 export
-  types, keccak, hash, rlpTypes
+  types, keccak, hash, rlpTypes, bitvector
 
 type
   BinaryTrie*[DB: TrieDatabase] = object
@@ -159,12 +159,12 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
     let key = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
     let subNode = parseNode(self.queryDB(key))
 
-    const bits = [@[binaryZero], @[binaryOne]]
-    let firstBit = bits[(newRightChild != BLANK_HASH).ord]
+    var firstBit = toBitVector(@[byte(0)], 1)
+    firstBit[0] = newRightChild != BLANK_HASH
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
-      let node = encodeKVNode(concat(firstBit, subNode.keyPath), subNode.child)
+      let node = encodeKVNode(firstBit & subNode.keyPath, subNode.child)
       result = self.hashAndSave(node)
     # kv node pointing to a branch node
     elif subNode.kind in {BRANCH_TYPE, LEAF_TYPE}:
@@ -259,7 +259,6 @@ template exists*(self: BinaryTrie, key: BytesContainer): bool =
 
 proc delete*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
   ## Equals to setting the value to zeroBytesRange
-
   self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange)
 
 proc deleteSubtrie*(self: var BinaryTrie, key: BytesContainer) {.inline.} =

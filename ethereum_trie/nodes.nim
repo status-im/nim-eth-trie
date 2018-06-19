@@ -1,5 +1,5 @@
 import
-  rlp/types as rlpTypes, utils/binaries, types, sequtils,
+  rlp/types as rlpTypes, bitvector, types, sequtils,
   ranges/ptr_arith
 
 type
@@ -56,18 +56,36 @@ proc parseNode*(node: BytesRange): TrieNode =
   else:
     raise newException(InvalidNode, "Unable to parse node")
 
-proc encodeKVNode*(keyPath: TrieBitVector | Bytes, childHash: TrieNodeKey): Bytes =
+proc encodeKVNode*(keyPath: TrieBitVector, childHash: TrieNodeKey): Bytes =
   ## Serializes a key/value node
-  const
-    KV_TYPE_PREFIX = @[KV_TYPE.byte]
-
   if keyPath.len == 0:
     raise newException(ValidationError, "Key path can not be empty")
-
   assert(childHash.len == 32)
 
-  let encodedKey = encodeFromBinKeypath(keyPath.toRange)
-  result = KV_TYPE_PREFIX.concat(encodedKey, childHash)
+  ## Encodes a sequence of 0s and 1s into tightly packed bytes
+  ## Used in encoding key path of a KV-NODE
+  let
+    len = keyPath.len
+    padding = ((not len) + 1) and 3 # modulo 4 padding
+    paddedBinLen = len + padding
+    prefix = len mod 4
+
+  result = newSeq[byte](((len + padding) div 8) + 34)
+  result[0] = KV_TYPE.byte
+  if paddedBinLen mod 8 == 4:
+    var nbits = 4 - padding
+    result[1] = byte(prefix shl 4) or keyPath.getBits(0, nbits)
+    for i in 0..<(len div 8):
+      result[i+2] = keyPath.getBits(nbits, 8)
+      inc(nbits, 8)
+  else:
+    var nbits = 8 - padding
+    result[1] = byte(0b1000_0000) or byte(prefix)
+    result[2] = keyPath.getBits(0, nbits)
+    for i in 0..<((len-1) div 8):
+      result[i+3] = keyPath.getBits(nbits, 8)
+      inc(nbits, 8)
+  copyMem(result[^32].addr, childHash.baseAddr, 32)
 
 proc encodeBranchNode*(leftChildHash, rightChildHash: TrieNodeKey): Bytes =
   ## Serializes a branch node
@@ -89,7 +107,7 @@ proc encodeLeafNode*(value: BytesRange | Bytes): Bytes =
 
   result = LEAF_TYPE_PREFIX.concat(value)
 
-proc getCommonPrefixLength*(a, b: Bytes | TrieBitVector): int =
+proc getCommonPrefixLength*(a, b: TrieBitVector): int =
   let len = min(a.len, b.len)
   for i in 0..<len:
     if a[i] != b[i]: return i
