@@ -58,7 +58,7 @@ encode the path using binary encoding, the scheme looks like this table below.
 
 if there is no padding, then yyyy bit sequence is absent, mm also zero. mm bits + padding bits must be 4 bits length.
 
-[nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie
+[nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie
 [nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie
-[badge-nimtrie-travisci]: https://travis-ci.org/status-im/nim-trie.svg?branch=master
+[badge-nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie.svg?branch=master
 [badge-nimtrie-appveyor]: https://ci.appveyor.com/api/projects/status/github/jarradh/nim-trie?svg=true
