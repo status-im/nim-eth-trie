@@ -1,5 +1,5 @@
 import
-  binary, utils/binaries, nodes, rlp/types,
+  binary, bitvector, binaries, rlp/types,
   nimcrypto/[keccak, hash], memdb
 
 type
@@ -41,7 +41,7 @@ proc checkIfBranchExist*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash, 
   ## the prefix of an existing key in the trie.
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
-  checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)).toRange)
+  checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)))
 
 proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector, output: var seq[BytesRange]) =
   if nodeHash == BLANK_HASH: return
@@ -83,7 +83,7 @@ proc getBranch*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash; key: Byte
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
   result = @[]
-  getBranchImpl(db, toRange(rootHash), encodeToBin(toRange(key)).toRange, result)
+  getBranchImpl(db, toRange(rootHash), encodeToBin(toRange(key)), result)
 
 proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
   when rootHash.type isnot KeccakHash:
@@ -171,4 +171,4 @@ proc getWitness*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash; key: Byt
   when nodeHash.type isnot KeccakHash:
     assert(nodeHash.len == 32)
   result = @[]
-  getWitnessImpl(db, toRange(nodeHash), encodeToBin(toRange(key)).toRange, result)
+  getWitnessImpl(db, toRange(nodeHash), encodeToBin(toRange(key)), result)

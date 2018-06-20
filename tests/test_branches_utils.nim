@@ -1,5 +1,5 @@
 import
-  ethereum_trie/[memdb, binary, branches, utils, utils.binaries], rlp/types,
+  ethereum_trie/[memdb, binary, branches], rlp/types,
   random, sets, unittest, strutils, sets
 
 suite "branches utils":

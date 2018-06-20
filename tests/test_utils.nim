@@ -1,27 +1,65 @@
 import
-  rlp/types as rlpTypes
+  rlp/types as rlpTypes, random, sets,
+  ethereum_trie/bitvector
 
-proc toBytesRange*(str: string): BytesRange =
-  var s = newSeq[byte](str.len)
-  if str.len > 0:
-    copyMem(s[0].addr, str[0].unsafeAddr, str.len)
-  result = toRange(s)
+type
+  RandGen*[T] = object
+    minVal, maxVal: T
 
-proc br*(str: string): BytesRange {.inline.} =
-  toBytesRange(str)
+  KVPair* = ref object
+    key*: string
+    value*: string
 
-proc parseBin*(str: string): Bytes =
-  result = newSeq[byte](str.len)
-  for i in 0..<str.len:
-    result[i] = byte(str[i].ord - '0'.ord)
+proc randGen*[T](minVal, maxVal: T): RandGen[T] =
+  assert(minVal <= maxVal)
+  result.minVal = minVal
+  result.maxVal = maxVal
 
-proc b*(str: string): Bytes =
+proc getVal*[T](x: RandGen[T]): T =
+  if x.minVal == x.maxVal: return x.minVal
+  rand(x.minVal..x.maxVal)
+
+proc randString*(len: int): string =
+  result = newString(len)
+  for i in 0..<len:
+    result[i] = rand(255).char
+
+proc randPrimitives*[T](val: int): T =
+  when T is string:
+    randString(val)
+  elif T is int:
+    rand(val)
+
+proc randList*(T: typedesc, strGen, listGen: RandGen): seq[T] =
+  let listLen = listGen.getVal()
+  result = newSeqOfCap[T](listLen)
+  var set = initSet[T]()
+  for len in 0..<listLen:
+    while true:
+      let x = randPrimitives[T](strGen.getVal())
+      if x notin set:
+        result.add x
+        set.incl x
+        break
+
+proc randKVPair*(): seq[KVPair] =
+  const listLen = 100
+  let keys = randList(string, randGen(32, 32), randGen(listLen, listLen))
+  let vals = randList(string, randGen(1, 100), randGen(listLen, listLen))
+
+  result = newSeq[KVPair](listLen)
+  for i in 0..<listLen:
+    result[i] = KVPair(key: keys[i], value: vals[i])
+
+proc toBytes*(str: string): Bytes =
   result = newSeq[byte](str.len)
   for i in 0..<str.len:
     result[i] = byte(str[i])
 
-proc toBytesRange*[T](data: seq[T]): BytesRange =
-  var s = newSeq[byte](data.len)
-  for i in 0..<data.len:
-    s[i] = byte(data[i])
-  result = toRange(s)
+proc genBitVec*(len: int): BitVector[byte] =
+  let k = ((len + 7) and (not 7)) shr 3
+  var s = newSeq[byte](k)
+  result = toBitVector(s, len)
+  for i in 0..<len:
+    result[i] = rand(2) == 1
+

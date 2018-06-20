@@ -93,6 +93,21 @@ proc `[]=`*[T](x: BitVector[T], idx: int, val: bool) {.inline.} =
 
   var start = x.data.baseAddr
   let p = start.shift(idx shr binShift)
+  let dist = bitMask - (idx and bitMask)
+  # sigh, complicated
+  p[] = p[] and (not T(0x01) shl dist)
+  p[] = p[] or (T(val) shl dist)
+
+proc setBit[T](x: BitVector[T], idx: int, val: bool) {.inline.} =
+  # assume the destination bit is already zeroed
+  assert(idx < x.len)
+
+  const
+    bitMask = sizeof(T) * 8 - 1
+    binShift = calcBinShift(bitMask)
+
+  var start = x.data.baseAddr
+  let p = start.shift(idx shr binShift)
   p[] = p[] or (T(val) shl (bitMask - (idx and bitMask)))
 
 proc `&`*[T](a, b: BitVector[T]): BitVector[T] =
@@ -103,8 +118,8 @@ proc `&`*[T](a, b: BitVector[T]): BitVector[T] =
   let len = (((a.len + b.len) + bitMask) and (not bitMask)) shr binShift
   result = toBitVector(newSeq[T](len), 0, a.len + b.len)
 
-  for i in 0..<a.len: result[i] = a[i]
-  for i in 0..<b.len: result[i + a.len] = b[i]
+  for i in 0..<a.len: result.setBit(i, a[i])
+  for i in 0..<b.len: result.setBit(i + a.len, b[i])
 
 proc `$`*(x: BitVector): string =
   result = newStringOfCap(x.len)
@@ -115,31 +130,3 @@ proc getBits*[T](x: BitVector[T], offset, num: int): T =
   assert(num <= sizeof(T) * 8)
   for i in 0..<num:
     result = (result shl 1) or T(x[offset + i])
-
-# ----------------------------------------------
-type
-  TrieBitVector* = BitVector[byte]
-
-template sliceToEnd*(r: TrieBitVector, index: int): TrieBitVector =
-  if r.len <= index: TrieBitVector() else: r[index .. ^1]
-
-template encodeToBin*(value: BytesRange): TrieBitVector =
-  ## ASCII -> "0100000101010011010000110100100101001001"
-  toBitVector(value)
-
-proc decodeToBinKeypath*(path: BytesRange): TrieBitVector =
-  ## Decodes bytes into a sequence of 0s and 1s
-  ## Used in decoding key path of a KV-NODE
-  var path = encodeToBin(path)
-  if path[0] == binaryOne:
-    path = path[4..^1]
-
-  assert path[0] == binaryZero
-  assert path[1] == binaryZero
-  var bits = path[2].int shl 1
-  bits = bits or path[3].int
-
-  if path.len > 4:
-    result = path[4+((4 - bits) mod 4)..^1]
-  else:
-    result = BitVector[byte]()

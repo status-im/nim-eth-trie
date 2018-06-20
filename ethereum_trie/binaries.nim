@@ -10,6 +10,8 @@ type
 
   TrieNodeKey* = BytesRange
 
+  TrieBitVector* = BitVector[byte]
+
   TrieNode* = object
     case kind*: TrieNodeKind
     of KV_TYPE:
@@ -23,6 +25,31 @@ type
 
   InvalidNode* = object of Exception
   ValidationError* = object of Exception
+
+# ----------------------------------------------
+template sliceToEnd*(r: TrieBitVector, index: int): TrieBitVector =
+  if r.len <= index: TrieBitVector() else: r[index .. ^1]
+
+template encodeToBin*(value: BytesRange): TrieBitVector =
+  ## ASCII -> "0100000101010011010000110100100101001001"
+  toBitVector(value)
+
+proc decodeToBinKeypath*(path: BytesRange): TrieBitVector =
+  ## Decodes bytes into a sequence of 0s and 1s
+  ## Used in decoding key path of a KV-NODE
+  var path = encodeToBin(path)
+  if path[0] == binaryOne:
+    path = path[4..^1]
+
+  assert path[0] == binaryZero
+  assert path[1] == binaryZero
+  var bits = path[2].int shl 1
+  bits = bits or path[3].int
+
+  if path.len > 4:
+    result = path[4+((4 - bits) mod 4)..^1]
+  else:
+    result = BitVector[byte]()
 
 proc parseNode*(node: BytesRange): TrieNode =
   # Input: a serialized node
@@ -62,8 +89,9 @@ proc encodeKVNode*(keyPath: TrieBitVector, childHash: TrieNodeKey): Bytes =
     raise newException(ValidationError, "Key path can not be empty")
   assert(childHash.len == 32)
 
-  ## Encodes a sequence of 0s and 1s into tightly packed bytes
-  ## Used in encoding key path of a KV-NODE
+  # Encodes a sequence of 0s and 1s into tightly packed bytes
+  # Used in encoding key path of a KV-NODE
+  # KV-NODE = KV-TYPE-PREFIX + encoded keypath + 32 bytes hash
   let
     len = keyPath.len
     padding = ((not len) + 1) and 3 # modulo 4 padding

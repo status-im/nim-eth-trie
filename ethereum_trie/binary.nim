@@ -1,9 +1,9 @@
 import
-  nimcrypto/[keccak, hash], types, bitvector, nodes,
+  nimcrypto/[keccak, hash], types, bitvector, binaries,
   rlp/types as rlpTypes, utils, ranges/ptr_arith
 
 export
-  types, keccak, hash, rlpTypes, bitvector
+  types, keccak, hash, rlpTypes, bitvector, utils
 
 type
   BinaryTrie*[DB: TrieDatabase] = object
@@ -13,17 +13,6 @@ type
   NodeOverrideError* = object of Exception
 
   BytesContainer* = BytesRange | Bytes | string
-
-proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
-  result = newRange[byte](32)
-  copyMem(result.baseAddr, hash.data.baseAddr, 32)
-
-proc toHash*(nodeHash: TrieNodeKey): KeccakHash =
-  assert(nodeHash.len == 32)
-  copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
-
-template toRange*(hash: KeccakHash): BytesRange =
-  toTrieNodeKey(hash)
 
 let
   BLANK_HASH*     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").toTrieNodeKey
@@ -159,8 +148,8 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
     let key = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
     let subNode = parseNode(self.queryDB(key))
 
-    var firstBit = toBitVector(@[byte(0)], 1)
-    firstBit[0] = newRightChild != BLANK_HASH
+    # 0bx000_0000
+    var firstBit = toBitVector(@[byte(newRightChild != BLANK_HASH) shl 7], 1)
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
@@ -264,7 +253,7 @@ proc delete*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
 proc deleteSubtrie*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
   ## Given a key prefix, delete the whole subtrie that starts with the key prefix.
   ## Key will be encoded into binary array format first.
-  ## It will call `_set` with `if_delete_subtrie` set to True.
+  ## It will call `setAux` with `deleteSubtrie` set to true.
 
   self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange, true)
 
