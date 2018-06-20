@@ -148,3 +148,30 @@ suite "binaries utils":
       check kvnode[0].ord == KV_TYPE.ord
       check keyPath == bitvec
       check kvnode[^32..^1] == nodeHash
+
+  test "optimized single bit keypath kvnode encoding":
+    var k = 1
+    var nodeHash = keccak256.digest(cast[ptr byte](k.addr), uint(sizeof(int))).toRange
+    var bitvec = genBitVec(1)
+    bitvec[0] = false
+    var kvnode = encodeKVNode(bitvec, nodeHash).toRange
+    var kp = decodeToBinKeypath(kvnode[1..^33])
+
+    var okv = encodeKVNode(false, nodeHash).toRange
+    check okv == kvnode
+    var okp = decodeToBinKeypath(kvnode[1..^33])
+    check okp == kp
+    check okp.len == 1
+    check okp == bitvec
+
+    bitvec[0] = true
+    kvnode = encodeKVNode(bitvec, nodeHash).toRange
+    kp = decodeToBinKeypath(kvnode[1..^33])
+
+    okv = encodeKVNode(true, nodeHash).toRange
+    check okv == kvnode
+    okp = decodeToBinKeypath(kvnode[1..^33])
+    check okp == kp
+    check okp.len == 1
+    check okp == bitvec
+

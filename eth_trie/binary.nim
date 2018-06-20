@@ -36,6 +36,8 @@ proc getDB*[DB](self: BinaryTrie[DB]): ref DB {.inline.} =
   self.dbLink
 
 template queryDB(self: BinaryTrie, nodeHash: TrieNodeKey): BytesRange =
+  # perhaps the underlying DB should accept BytesRange too
+  # to avoid toHash conversion
   self.dbLink[].get(toHash(nodeHash)).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
@@ -71,6 +73,9 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
   return self.getAux(self.rootHash, keyBits)
 
 proc hashAndSave(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
+  # perhaps nimcrypto digest can produce BytesRange too?
+  # and the underlying DB can accept BytesRange too
+  # therefore we can avoid conversion
   let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
   discard self.dbLink[].put(nodeHash, node)
   result = toTrieNodeKey(nodeHash)
@@ -150,19 +155,19 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   # Compress branch node into kv node
   if newLeftChild == BLANK_HASH or newRightChild == BLANK_HASH:
     let key = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
-    let subNode = parseNode(self.queryDB(key))
-
-    # 0bx000_0000
-    var firstByte = @[byte(newRightChild != BLANK_HASH) shl 7]
-    var firstBit = firstByte.bits(1)
+    var subNode = parseNode(self.queryDB(key))
+    var firstBit = newRightChild != BLANK_HASH
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
-      let node = encodeKVNode(firstBit & subNode.keyPath, subNode.child)
+      # exploit subNode.keyPath unused prefix bit
+      # to avoid bitVector concat
+      subNode.keyPath.pushFront(firstBit)
+      let node = encodeKVNode(subNode.keyPath, subNode.child)
       result = self.hashAndSave(node)
     # kv node pointing to a branch node
     elif subNode.kind in {BRANCH_TYPE, LEAF_TYPE}:
-      let childNode = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
+      let childNode = if firstBit: newRightChild else: newLeftChild
       let node = encodeKVNode(firstBit, childNode)
       result = self.hashAndSave(node)
   else:
