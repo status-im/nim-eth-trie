@@ -28,19 +28,24 @@ proc randPrimitives*[T](val: int): T =
   when T is string:
     randString(val)
   elif T is int:
-    rand(val)
+    result = val
 
-proc randList*(T: typedesc, strGen, listGen: RandGen): seq[T] =
+proc randList*(T: typedesc, strGen, listGen: RandGen, unique: bool = true): seq[T] =
   let listLen = listGen.getVal()
   result = newSeqOfCap[T](listLen)
-  var set = initSet[T]()
-  for len in 0..<listLen:
-    while true:
+  if unique:
+    var set = initSet[T]()
+    for len in 0..<listLen:
+      while true:
+        let x = randPrimitives[T](strGen.getVal())
+        if x notin set:
+          result.add x
+          set.incl x
+          break
+  else:
+    for len in 0..<listLen:
       let x = randPrimitives[T](strGen.getVal())
-      if x notin set:
-        result.add x
-        set.incl x
-        break
+      result.add x
 
 proc randKVPair*(): seq[KVPair] =
   const listLen = 100

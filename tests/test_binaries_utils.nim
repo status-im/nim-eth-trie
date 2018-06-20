@@ -1,7 +1,7 @@
 import
   ethereum_trie/[binaries, bitvector, utils],
-  test_utils, rlp/types,
-  unittest, strutils
+  test_utils, rlp/types, unittest, strutils,
+  nimcrypto/[keccak, hash]
 
 proc parseBitVector(x: string): BitVector[byte] =
   result = genBitVec(x.len)
@@ -129,3 +129,18 @@ suite "binaries utils":
         discard
       except:
         check(false)
+
+  test "random kv encoding":
+    let lengths = randList(int, randGen(1, 999), randGen(100, 100), unique = false)
+    for len in lengths:
+      var k = len
+      var bitvec = genBitVec(len)
+      var nodeHash = keccak256.digest(cast[ptr byte](k.addr), uint(sizeof(int))).toRange
+      var kvnode = encodeKVNode(bitvec, nodeHash).toRange
+      # first byte if KV_TYPE
+      # in the middle are 1..n bits of binary-encoded-keypath
+      # last 32 bytes are hash
+      var keyPath = decodeToBinKeypath(kvnode[1..^33])
+      check kvnode[0].ord == KV_TYPE.ord
+      check keyPath == bitvec
+      check kvnode[^32..^1] == nodeHash
