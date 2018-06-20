@@ -1,5 +1,5 @@
 import
-  ethereum_trie/[binaries, bitvector, utils],
+  eth_trie/[binaries, bitvector, utils],
   test_utils, rlp/types, unittest, strutils,
   nimcrypto/[keccak, hash]
 

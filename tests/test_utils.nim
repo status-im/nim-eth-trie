@@ -1,6 +1,6 @@
 import
   rlp/types as rlpTypes, random, sets,
-  ethereum_trie/bitvector
+  eth_trie/bitvector
 
 type
   RandGen*[T] = object

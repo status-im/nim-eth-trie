@@ -1,6 +1,6 @@
 import
   os, json, tables, sequtils, strutils,
-  rlp/types, ethereum_trie, ethereum_trie/memdb
+  rlp/types, eth_trie, eth_trie/memdb
 
 proc hexRepr*(bytes: BytesRange): string =
   result = newStringOfCap(bytes.len * 2)

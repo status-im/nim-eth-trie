@@ -1,6 +1,6 @@
 import
   tables, hashes, rlp/types as rlpTypes,
-  ethereum_trie/types
+  eth_trie/types
 
 type
   MemDBTable = Table[KeccakHash, Bytes]

@@ -1,5 +1,5 @@
 import
-  ethereum_trie/bitvector, test_utils,
+  eth_trie/bitvector, test_utils,
   rlp/types as rlpTypes, random, unittest
 
 suite "bitvector":

@@ -100,7 +100,7 @@ and then you want to continue/resume the trie operations.
 
 ```Nim
 import
-  ethereum_trie/[memdb, binary, utils]
+  [[eth_trie/[memdb,]] binary, utils]
 
 var db = newMemDB()
 var trie = initBinaryTrie(db)
@@ -156,7 +156,7 @@ Therefore a list is enough to reconstruct the entire trie/branch.
 
 ```Nim
 import
-  ethereum_trie/[memdb, binary, utils]
+  eth_trie/[memdb, binary, utils]
 
 var db = newMemDB()
 var trie = initBinaryTrie(db)

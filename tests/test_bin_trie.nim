@@ -1,5 +1,5 @@
 import
-  ethereum_trie/[memdb, binary],
+  eth_trie/[memdb, binary],
   unittest, test_utils, random
 
 suite "binary trie":

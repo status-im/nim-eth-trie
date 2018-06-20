@@ -1,5 +1,5 @@
 import
-  ethereum_trie/[memdb, binary, utils, branches],
+  eth_trie/[memdb, binary, utils, branches],
   nimcrypto/[keccak, hash], unittest
 
 suite "examples":

@@ -1,6 +1,6 @@
 import
   tables, ranges/ptr_arith, keccak_tiny,
-  rlp, ethereum_trie/[nibbles, types]
+  rlp, eth_trie/[nibbles, types]
 
 export
   types

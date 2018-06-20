@@ -1,6 +1,6 @@
 mode = ScriptMode.Verbose
 
-packageName   = "ethereum_trie"
+packageName   = "eth_trie"
 version       = "1.0.0"
 author        = "Status Research & Development GmbH"
 description   = "Merkle Patricia Tries as specified by Ethereum"
