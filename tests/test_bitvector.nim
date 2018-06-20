@@ -46,3 +46,16 @@ suite "bitvector":
       for idx, bit in x:
         y[idx] = bit
       check x == y
+
+  test "constructor with start":
+    var a = @[0b10101010_11110000_00001111_01010101'u32]
+    var b = toBitVector(a, 1, 8)
+    check b.len == 8
+    check b[0] == false
+    check $b == "01010101"
+    b[0] = true
+    check $b == "11010101"
+    check b[0] == true
+    b.pushFront(false)
+    check b[0] == false
+    check $b == "011010101"

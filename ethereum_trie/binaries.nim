@@ -114,6 +114,12 @@ proc encodeKVNode*(keyPath: TrieBitVector, childHash: TrieNodeKey): Bytes =
       result[i+3] = keyPath.getBits(nbits, 8)
       inc(nbits, 8)
   copyMem(result[^32].addr, childHash.baseAddr, 32)
+  
+proc encodeKVNode*(keyPath: bool, childHash: TrieNodeKey): Bytes =
+  result = newSeq[byte](34)
+  result[0] = KV_TYPE.byte
+  result[1] = byte(16) or byte(keyPath)
+  copyMem(result[^32].addr, childHash.baseAddr, 32)
 
 proc encodeBranchNode*(leftChildHash, rightChildHash: TrieNodeKey): Bytes =
   ## Serializes a branch node

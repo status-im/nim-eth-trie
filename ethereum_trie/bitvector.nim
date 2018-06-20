@@ -92,10 +92,11 @@ proc `[]=`*[T](x: BitVector[T], idx: int, val: bool) {.inline.} =
     binShift = calcBinShift(bitMask)
 
   var start = x.data.baseAddr
-  let p = start.shift(idx shr binShift)
-  let dist = bitMask - (idx and bitMask)
+  let pos = x.start + idx
+  let p = start.shift(pos shr binShift)
+  let dist = bitMask - (pos and bitMask)
   # sigh, complicated
-  p[] = p[] and (not T(0x01) shl dist)
+  p[] = p[] and (not (T(1) shl dist))
   p[] = p[] or (T(val) shl dist)
 
 proc setBit[T](x: BitVector[T], idx: int, val: bool) {.inline.} =
@@ -107,8 +108,9 @@ proc setBit[T](x: BitVector[T], idx: int, val: bool) {.inline.} =
     binShift = calcBinShift(bitMask)
 
   var start = x.data.baseAddr
-  let p = start.shift(idx shr binShift)
-  p[] = p[] or (T(val) shl (bitMask - (idx and bitMask)))
+  let pos = x.start + idx
+  let p = start.shift(pos shr binShift)
+  p[] = p[] or (T(val) shl (bitMask - (pos and bitMask)))
 
 proc `&`*[T](a, b: BitVector[T]): BitVector[T] =
   const
@@ -130,3 +132,9 @@ proc getBits*[T](x: BitVector[T], offset, num: int): T =
   assert(num <= sizeof(T) * 8)
   for i in 0..<num:
     result = (result shl 1) or T(x[offset + i])
+
+proc pushFront*(x: var BitVector, val: bool) =
+  assert(x.start > 0)
+  dec(x.start)
+  x[0] = val
+  inc(x.mLen)
