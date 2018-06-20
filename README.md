@@ -192,6 +192,7 @@ var branchB = getBranch(db, trie.getRootHash(), "key2")
 # ==> [A, B, C2, D2]
 
 assert isValidBranch(branchA, trie.getRootHash(), "key1", "value1") == true
+# wrong key, return zero bytes
 assert isValidBranch(branchA, trie.getRootHash(), "key5", "") == true
 
 assert isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # Key Error
@@ -211,14 +212,14 @@ branch = getWitness(db, trie.getRootHash(), "key")
 # this will include additional nodes of "key2"
 # ==> [A, B, C1, D1, C2, D2]
 
-branch = getWitness(db, trie.getRootHash(), "")
+var wholeTrie = getWitness(db, trie.getRootHash(), "")
 # this will return the whole trie
 # ==> [A, B, C1, D1, C2, D2]
 
 var node = branch[1] # B
 let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
 var nodes = getTrieNodes(db, nodeHash)
-assert nodes.len == branchs.len - 1
+assert nodes.len == wholeTrie.len - 1
 # ==> [B, C1, D1, C2, D2]
 ```
 
