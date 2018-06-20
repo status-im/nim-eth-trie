@@ -1,5 +1,5 @@
 import
-  binary, utils/binaries, nodes, rlp/types,
+  binary, bitvector, binaries, rlp/types,
   nimcrypto/[keccak, hash], memdb
 
 type
@@ -36,12 +36,14 @@ proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: Tr
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc checkIfBranchExist*[DB](db: ref DB; rootHash: TrieNodeKey; keyPrefix: BytesRange): bool =
+proc checkIfBranchExist*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash, keyPrefix: BytesContainer): bool =
   ## Given a key prefix, return whether this prefix is
   ## the prefix of an existing key in the trie.
-  checkIfBranchExistImpl(db, rootHash, encodeToBin(keyPrefix).toRange)
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
+  checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)))
 
-proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: TrieBitVector, output: var seq[BytesRange]) =
+proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector, output: var seq[BytesRange]) =
   if nodeHash == BLANK_HASH: return
 
   let nodeVal = db.query(nodeHash)
@@ -76,12 +78,17 @@ proc getBranchImpl[DB](db: ref DB; nodeHash, keyPath: TrieBitVector, output: var
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getBranch*[DB](db: ref DB; rootHash: TrieNodeKey; key: BytesRange): seq[BytesRange] =
+proc getBranch*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##     Get a long-format Merkle branch
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
   result = @[]
-  getBranchImpl(db, rootHash, encodeToBin(key).toRange, result)
+  getBranchImpl(db, toRange(rootHash), encodeToBin(toRange(key)), result)
 
-proc isValidBranch*(branch: seq[BytesRange], rootHash: TrieNodeKey, key, value: BytesRange): bool =
+proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
+  when rootHash.type isnot KeccakHash:
+    assert(rootHash.len == 32)
+
   # branch must not be empty
   assert(branch.len != 0)
 
@@ -92,7 +99,7 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: TrieNodeKey, key, value: 
     discard db[].put(nodeHash, node)
 
   var trie = initBinaryTrie(db, rootHash)
-  result = trie.get(key) == value
+  result = trie.get(key) == toRange(value)
 
 proc getTrieNodesImpl[DB](db: ref DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]): bool =
   ## Get full trie of a given root node
@@ -118,9 +125,11 @@ proc getTrieNodesImpl[DB](db: ref DB; nodeHash: TrieNodeKey, output: var seq[Byt
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getTrieNodes*[DB](db: ref DB; nodeHash: TrieNodeKey): seq[BytesRange] =
+proc getTrieNodes*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash): seq[BytesRange] =
+  when nodeHash.type isnot KeccakHash:
+    assert(nodeHash.len == 32)
   result = @[]
-  discard getTrieNodesImpl(db, nodeHash, result)
+  discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
 proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVector; output: var seq[BytesRange]) =
   if keyPath.len == 0:
@@ -153,11 +162,13 @@ proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVect
   else:
     raise newException(Exception, "Invariant: unreachable code path")
 
-proc getWitness*[DB](db: ref DB; nodeHash: BytesRange; key: BytesRange): seq[BytesRange] =
+proc getWitness*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##  Get all witness given a keyPath prefix.
   ##  Include
   ##
   ##  1. witness along the keyPath and
   ##  2. witness in the subtrie of the last node in keyPath
+  when nodeHash.type isnot KeccakHash:
+    assert(nodeHash.len == 32)
   result = @[]
-  getWitnessImpl(db, nodeHash, encodeToBin(key).toRange, result)
+  getWitnessImpl(db, toRange(nodeHash), encodeToBin(toRange(key)), result)
