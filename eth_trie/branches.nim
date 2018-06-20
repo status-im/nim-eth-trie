@@ -1,6 +1,7 @@
 import
-  binary, bitvector, binaries, rlp/types,
-  nimcrypto/[keccak, hash], memdb
+  nimcrypto/[keccak, hash],
+  rlp/types, ranges/bitranges,
+  binary, binaries, memdb
 
 type
   InvalidKeyError* = object of Exception
@@ -8,7 +9,7 @@ type
 template query[DB](db: ref DB, nodeHash: TrieNodeKey): BytesRange =
   db[].get(toHash(nodeHash)).toRange
 
-proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitVector): bool =
+proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitRange): bool =
   if nodeHash == BLANK_HASH:
     return false
 
@@ -29,7 +30,7 @@ proc checkIfBranchExistImpl[DB](db: ref DB; nodeHash: TrieNodeKey; keyPrefix: Tr
       return false
   of BRANCH_TYPE:
     if keyPrefix.len == 0: return true
-    if keyPrefix[0] == binaryZero:
+    if keyPrefix[0] == false:
       return checkIfBranchExistImpl(db, node.leftChild, keyPrefix.sliceToEnd(1))
     else:
       return checkIfBranchExistImpl(db, node.rightChild, keyPrefix.sliceToEnd(1))
@@ -41,9 +42,11 @@ proc checkIfBranchExist*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash, 
   ## the prefix of an existing key in the trie.
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
-  checkIfBranchExistImpl(db, toRange(rootHash), encodeToBin(toRange(keyPrefix)))
 
-proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector, output: var seq[BytesRange]) =
+  var keyPrefixBits = bits MutByteRange(keyPrefix.toRange)
+  checkIfBranchExistImpl(db, toRange(rootHash), keyPrefixBits)
+
+proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitRange, output: var seq[BytesRange]) =
   if nodeHash == BLANK_HASH: return
 
   let nodeVal = db.query(nodeHash)
@@ -70,7 +73,7 @@ proc getBranchImpl[DB](db: ref DB; nodeHash: TrieNodeKey, keyPath: TrieBitVector
       raise newException(InvalidKeyError, "Key too short")
 
     output.add nodeVal
-    if keyPath[0] == binaryZero:
+    if keyPath[0] == false:
       getBranchImpl(db, node.leftChild, keyPath.sliceToEnd(1), output)
     else:
       getBranchImpl(db, node.rightChild, keyPath.sliceToEnd(1), output)
@@ -83,7 +86,8 @@ proc getBranch*[DB](db: ref DB; rootHash: BytesContainer | KeccakHash; key: Byte
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
   result = @[]
-  getBranchImpl(db, toRange(rootHash), encodeToBin(toRange(key)), result)
+  var keyBits = bits MutByteRange(key.toRange)
+  getBranchImpl(db, toRange(rootHash), keyBits, result)
 
 proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
   when rootHash.type isnot KeccakHash:
@@ -131,7 +135,7 @@ proc getTrieNodes*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash): seq[B
   result = @[]
   discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
-proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVector; output: var seq[BytesRange]) =
+proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitRange; output: var seq[BytesRange]) =
   if keyPath.len == 0:
     if not getTrieNodesImpl(db, nodeHash, output): return
 
@@ -155,7 +159,7 @@ proc getWitnessImpl*[DB](db: ref DB; nodeHash: TrieNodeKey; keyPath: TrieBitVect
       getWitnessImpl(db, node.child, keyPath.sliceToEnd(node.keyPath.len), output)
   of BRANCH_TYPE:
     output.add nodeVal
-    if keyPath[0] == binaryZero:
+    if keyPath[0] == false:
       getWitnessImpl(db, node.leftChild, keyPath.sliceToEnd(1), output)
     else:
       getWitnessImpl(db, node.rightChild, keyPath.sliceToEnd(1), output)
@@ -171,4 +175,5 @@ proc getWitness*[DB](db: ref DB; nodeHash: BytesContainer | KeccakHash; key: Byt
   when nodeHash.type isnot KeccakHash:
     assert(nodeHash.len == 32)
   result = @[]
-  getWitnessImpl(db, toRange(nodeHash), encodeToBin(toRange(key)), result)
+  var keyBits = bits MutByteRange(key.toRange)
+  getWitnessImpl(db, toRange(nodeHash), keyBits, result)

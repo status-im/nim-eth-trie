@@ -1,6 +1,6 @@
 import
-  rlp/types as rlpTypes, random, sets,
-  eth_trie/bitvector
+  random, sets,
+  rlp/types as rlpTypes, ranges/bitranges
 
 type
   RandGen*[T] = object
@@ -61,10 +61,10 @@ proc toBytes*(str: string): Bytes =
   for i in 0..<str.len:
     result[i] = byte(str[i])
 
-proc genBitVec*(len: int): BitVector[byte] =
+proc genBitVec*(len: int): BitRange =
   let k = ((len + 7) and (not 7)) shr 3
   var s = newSeq[byte](k)
-  result = toBitVector(s, len)
+  result = bits(s, len)
   for i in 0..<len:
     result[i] = rand(2) == 1
 

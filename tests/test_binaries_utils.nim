@@ -1,9 +1,10 @@
 import
-  eth_trie/[binaries, bitvector, utils],
-  test_utils, rlp/types, unittest, strutils,
-  nimcrypto/[keccak, hash]
+  unittest, strutils,
+  ranges/bitranges, rlp/types, nimcrypto/[keccak, hash],
+  eth_trie/[binaries, utils],
+  test_utils
 
-proc parseBitVector(x: string): BitVector[byte] =
+proc parseBitVector(x: string): BitRange =
   result = genBitVec(x.len)
   for i, c in x:
     result[i] = (c == '1')
@@ -22,8 +23,11 @@ suite "binaries utils":
 
   test "get common prefix length":
     for c in commonPrefixData:
-      let actual_a = getCommonPrefixLength(c[0].toBitVector, c[1].toBitVector)
-      let actual_b = getCommonPrefixLength(c[1].toBitVector, c[0].toBitVector)
+      var
+        c0 = c[0]
+        c1 = c[1]
+      let actual_a = getCommonPrefixLength(c0.bits, c1.bits)
+      let actual_b = getCommonPrefixLength(c1.bits, c0.bits)
       let expected = c[2]
       check actual_a == actual_b
       check actual_a == expected

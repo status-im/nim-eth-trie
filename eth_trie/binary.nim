@@ -1,9 +1,11 @@
 import
-  nimcrypto/[keccak, hash], types, bitvector, binaries,
-  rlp/types as rlpTypes, utils, ranges/ptr_arith
+  nimcrypto/[keccak, hash],
+  ranges/[ptr_arith, typedranges, bitranges],
+  rlp/types as rlpTypes,
+  types, binaries, utils
 
 export
-  types, keccak, hash, rlpTypes, bitvector, utils
+  types, keccak, hash, rlpTypes, utils
 
 type
   BinaryTrie*[DB: TrieDatabase] = object
@@ -36,7 +38,7 @@ proc getDB*[DB](self: BinaryTrie[DB]): ref DB {.inline.} =
 template queryDB(self: BinaryTrie, nodeHash: TrieNodeKey): BytesRange =
   self.dbLink[].get(toHash(nodeHash)).toRange
 
-proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitVector): BytesRange =
+proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
   if nodeHash == BLANK_HASH:
     return zeroBytesRange
@@ -59,28 +61,29 @@ proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitVector): By
   elif node.kind == BRANCH_TYPE:
     # keyPath too short
     if keyPath.len == 0: return zeroBytesRange
-    if keyPath[0] == binaryZero:
+    if keyPath[0] == false:
       return self.getAux(node.leftChild, keyPath.sliceToEnd(1))
     else:
       return self.getAux(node.rightChild, keyPath.sliceToEnd(1))
 
 proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
-  return self.getAux(self.rootHash, encodeToBin(toRange(key)))
+  var keyBits = MutByteRange(key.toRange).bits
+  return self.getAux(self.rootHash, keyBits)
 
 proc hashAndSave(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
   discard self.dbLink[].put(nodeHash, node)
   result = toTrieNodeKey(nodeHash)
 
-proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
+proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   value: BytesRange, deleteSubtrie = false): TrieNodeKey
-proc setKVNode(self: BinaryTrie, keyPath: TrieBitVector, nodeHash: TrieNodeKey,
+proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   node: TrieNode, value: BytesRange, deleteSubtrie = false): TrieNodeKey
 
 const
   overrideErrorMsg = "Fail to set the value because the prefix of it's key is the same as existing key"
 
-proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitVector,
+proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   value: BytesRange, deleteSubtrie = false): TrieNodeKey =
   ## If deleteSubtrie is set to True, what it will do is that it take in a keyPath
   ## and traverse til the end of keyPath, then delete the whole subtrie of that node.
@@ -129,14 +132,15 @@ proc set*(self: var BinaryTrie, key, value: distinct BytesContainer) {.inline.} 
   ## Sets the value at the given keyPath from the given node
   ## Key will be encoded into binary array format first.
 
-  self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), toRange(value))
+  var keyBits = bits MutByteRange(key.toRange)
+  self.rootHash = self.setAux(self.rootHash, keyBits, toRange(value))
 
-proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
+proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   value: BytesRange, deleteSubtrie = false): TrieNodeKey =
   # Which child node to update? Depends on first bit in keyPath
   var newLeftChild, newRightChild: TrieNodeKey
 
-  if keyPath[0] == binaryZero:
+  if keyPath[0] == false:
     newLeftChild  = self.setAux(node.leftChild, keyPath[1..^1], value, deleteSubtrie)
     newRightChild = node.rightChild
   else:
@@ -149,7 +153,8 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
     let subNode = parseNode(self.queryDB(key))
 
     # 0bx000_0000
-    var firstBit = toBitVector(@[byte(newRightChild != BLANK_HASH) shl 7], 1)
+    var firstByte = @[byte(newRightChild != BLANK_HASH) shl 7]
+    var firstBit = firstByte.bits(1)
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
@@ -163,7 +168,7 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitVector, node: TrieNode,
   else:
     result = self.hashAndSave(encodeBranchNode(newLeftChild, newRightChild))
 
-proc setKVNode(self: BinaryTrie, keyPath: TrieBitVector, nodeHash: TrieNodeKey,
+proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   node: TrieNode, value: BytesRange, deleteSubtrie = false): TrieNodeKey =
   # keyPath prefixes match
   if deleteSubtrie:
@@ -227,7 +232,7 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitVector, nodeHash: TrieNodeKey,
     # Create the new branch node (because the key paths diverge, there has to
     # be some "first bit" at which they diverge, so there must be a branch
     # node somewhere)
-    if keyPath[commonPrefixLen] == binaryOne:
+    if keyPath[commonPrefixLen] == true:
       newSub = self.hashAndSave(encodeBranchNode(oldNode, valNode))
     else:
       newSub = self.hashAndSave(encodeBranchNode(valNode, oldNode))
@@ -248,14 +253,16 @@ template exists*(self: BinaryTrie, key: BytesContainer): bool =
 
 proc delete*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
   ## Equals to setting the value to zeroBytesRange
-  self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange)
+  var keyBits = bits MutByteRange(key.toRange)
+  self.rootHash = self.setAux(self.rootHash, keyBits, zeroBytesRange)
 
 proc deleteSubtrie*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
   ## Given a key prefix, delete the whole subtrie that starts with the key prefix.
   ## Key will be encoded into binary array format first.
   ## It will call `setAux` with `deleteSubtrie` set to true.
 
-  self.rootHash = self.setAux(self.rootHash, encodeToBin(toRange(key)), zeroBytesRange, true)
+  var keyBits = bits MutByteRange(key.toRange)
+  self.rootHash = self.setAux(self.rootHash, keyBits, zeroBytesRange, true)
 
 # Convenience
 proc rootNode*(self: BinaryTrie): BytesRange {.inline.} =

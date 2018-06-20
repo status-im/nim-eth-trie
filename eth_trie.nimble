@@ -7,7 +7,10 @@ description   = "Merkle Patricia Tries as specified by Ethereum"
 license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
-requires "nim >= 0.17.0", "rlp >= 1.0.1", "nimcrypto >= 0.3.1"
+requires "nim >= 0.18.1",
+         "rlp",
+         "nimcrypto",
+         "ranges"
 
 proc configForTests() =
   --hints: off
