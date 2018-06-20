@@ -57,7 +57,7 @@ encode the path using binary encoding, the scheme looks like this table below.
 | 1000   | even numbered nibbles prefix |
 
 if there is no padding, then yyyy bit sequence is absent, mm also zero.
-mm bits + padding bits must be 4 bits length.
+yyyy = mm bits + padding bits must be 4 bits length.
 
 ### The API
 
@@ -69,6 +69,8 @@ Both `key` and `value` are of `BytesRange` type. And they cannot have zero lengt
 You can also use convenience API `get` and `set` which accepts
 `Bytes` or `string` (a `string` is conceptually wrong in this context
 and may costlier than a `BytesRange`, but it is good for testing purpose).
+
+Getting a non-existent key will return zero length BytesRange.
 
 Binary-trie also provide dictionary syntax API for `set` and `get`.
 * trie[key] = value -- same as `set`
