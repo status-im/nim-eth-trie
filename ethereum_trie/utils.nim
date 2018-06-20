@@ -1,12 +1,20 @@
-import rlp/types as rlpTypes, strutils, nimcrypto/hash, parseutils
+import
+  rlp/types as rlpTypes, strutils,
+  nimcrypto/hash, parseutils, types, binaries,
+  ranges/ptr_arith
 
-proc toMemRange*(r: BytesRange): MemRange =
-  makeMemRange(r.baseAddr, r.len)
+proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
 
-proc toHex*(r: BytesRange): string =
-  result = newStringOfCap(r.len * 2)
-  for c in r:
-    result.add toHex(c.ord, 2)
+proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
+  result = newRange[byte](32)
+  copyMem(result.baseAddr, hash.data.baseAddr, 32)
+
+proc toHash*(nodeHash: TrieNodeKey): KeccakHash =
+  assert(nodeHash.len == 32)
+  copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
+
+template toRange*(hash: KeccakHash): BytesRange =
+  toTrieNodeKey(hash)
 
 proc toRange*(str: string): BytesRange =
   var s = newSeq[byte](str.len)
@@ -28,4 +36,3 @@ proc hashFromHex*(bits: static[int], input: string): MDigest[bits] =
 "The input string contains invalid characters")
 
 template hashFromHex*(s: static[string]): untyped = hashFromHex(s.len * 4, s)
-proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr

@@ -1,55 +1,6 @@
 import
-  ethereum_trie/[memdb, binary, utils], rlp/types,
-  random, sets, unittest
-
-type
-  RandGen[T] = object
-    minVal, maxVal: T
-
-  KVPair = ref object
-    key: string
-    value: string
-
-proc randGen[T](minVal, maxVal: T): RandGen[T] =
-  assert(minVal <= maxVal)
-  result.minVal = minVal
-  result.maxVal = maxVal
-
-proc getVal[T](x: RandGen[T]): T =
-  if x.minVal == x.maxVal: return x.minVal
-  rand(x.minVal..x.maxVal)
-
-proc randString(len: int): string =
-  result = newString(len)
-  for i in 0..<len:
-    result[i] = rand(255).char
-
-proc randPrimitives[T](val: int): T =
-  when T is string:
-    randString(val)
-  elif T is int:
-    rand(val)
-
-proc randList(T: typedesc, strGen, listGen: RandGen): seq[T] =
-  let listLen = listGen.getVal()
-  result = newSeqOfCap[T](listLen)
-  var set = initSet[T]()
-  for len in 0..<listLen:
-    while true:
-      let x = randPrimitives[T](strGen.getVal())
-      if x notin set:
-        result.add x
-        set.incl x
-        break
-
-proc randKVPair(): seq[KVPair] =
-  const listLen = 100
-  let keys = randList(string, randGen(32, 32), randGen(listLen, listLen))
-  let vals = randList(string, randGen(1, 100), randGen(listLen, listLen))
-
-  result = newSeq[KVPair](listLen)
-  for i in 0..<listLen:
-    result[i] = KVPair(key: keys[i], value: vals[i])
+  ethereum_trie/[memdb, binary],
+  unittest, test_utils, random
 
 suite "binary trie":
 
@@ -57,12 +8,12 @@ suite "binary trie":
     randomize()
     var kv_pairs = randKVPair()
     var result = BLANK_HASH
-    for _ in 0..<3: # repeat 3 times
+    for _ in 0..<1: # repeat 3 times
       var db = newMemDB()
       var trie = initBinaryTrie(db)
       random.shuffle(kv_pairs)
 
-      for c in kv_pairs:
+      for i, c in kv_pairs:
         trie.set(c.key, c.value)
         let x = trie.get(c.key)
         let y = toRange(c.value)
@@ -77,7 +28,7 @@ suite "binary trie":
 
       # Delete all key/value
       random.shuffle(kv_pairs)
-      for c in kv_pairs:
+      for i, c in kv_pairs:
         trie.delete(c.key)
       check trie.getRootHash() == BLANK_HASH
 

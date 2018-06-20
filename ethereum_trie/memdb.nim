@@ -45,6 +45,9 @@ proc `$`*(db: MemDB): string =
   for k, v in db.tbl:
     echo k, " -> ", v
 
+proc len*(db: MemDB): int =
+  db.tbl.len
+
 static:
   assert MemDB is TrieDatabase
 
