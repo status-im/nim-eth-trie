@@ -20,13 +20,15 @@ let
   BLANK_HASH*     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").toTrieNodeKey
   zeroBytesRange* = Range[byte]()
 
-proc init*[DB](x: typedesc[BinaryTrie[DB]], db: ref DB, rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
+proc init*[DB](x: typedesc[BinaryTrie[DB]], db: ref DB,
+  rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
   result.dbLink = db
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
   result.rootHash = toRange(rootHash)
 
-proc initBinaryTrie*[DB](db: ref DB, rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
+proc initBinaryTrie*[DB](db: ref DB,
+  rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
   init(BinaryTrie[DB], db, rootHash)
 
 proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
@@ -35,17 +37,17 @@ proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
 proc getDB*[DB](self: BinaryTrie[DB]): ref DB {.inline.} =
   self.dbLink
 
-template queryDB(self: BinaryTrie, nodeHash: TrieNodeKey): BytesRange =
+template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
   # perhaps the underlying DB should accept BytesRange too
   # to avoid toHash conversion
-  self.dbLink[].get(toHash(nodeHash)).toRange
+  parseNode(self.dbLink[].get(toHash(nodeHash)).toRange)
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
   if nodeHash == BLANK_HASH:
     return zeroBytesRange
 
-  let node = parseNode(self.queryDB(nodeHash))
+  let node = self.fetchNode(nodeHash)
 
   # Key-value node descend
   if node.kind == LEAF_TYPE:
@@ -72,7 +74,7 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
   var keyBits = MutByteRange(key.toRange).bits
   return self.getAux(self.rootHash, keyBits)
 
-proc hashAndSave(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
+proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   # perhaps nimcrypto digest can produce BytesRange too?
   # and the underlying DB can accept BytesRange too
   # therefore we can avoid conversion
@@ -80,13 +82,23 @@ proc hashAndSave(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   discard self.dbLink[].put(nodeHash, node)
   result = toTrieNodeKey(nodeHash)
 
+template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
+  self.hashAndsave(encodeKVNode(keyPath, child))
+
+template saveLeaf(self: BinaryTrie, value: BytesRange): untyped =
+  self.hashAndsave(encodeLeafNode(value))
+
+template saveBranch(self: BinaryTrie, L, R: BytesRange): untyped =
+  self.hashAndsave(encodeBranchNode(L, R))
+
 proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   value: BytesRange, deleteSubtrie = false): TrieNodeKey
 proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   node: TrieNode, value: BytesRange, deleteSubtrie = false): TrieNodeKey
 
 const
-  overrideErrorMsg = "Fail to set the value because the prefix of it's key is the same as existing key"
+  overrideErrorMsg =
+    "Fail to set the value because the prefix of it's key is the same as existing key"
 
 proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   value: BytesRange, deleteSubtrie = false): TrieNodeKey =
@@ -107,10 +119,9 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   # Empty trie
   if nodeHash == BLANK_HASH:
     ifGoodValue:
-      let node = encodeKVNode(keyPath, self.hashAndsave(encodeLeafNode(value)))
-      return self.hashAndsave(node)
+      return self.saveKV(keyPath, self.saveLeaf(value))
 
-  let node = parseNode(self.queryDB(nodeHash))
+  let node = self.fetchNode(nodeHash)
 
   case node.kind
   of LEAF_TYPE:   # Node is a leaf node
@@ -120,7 +131,7 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
     if deleteSubtrie: return BLANK_HASH
 
     ifGoodValue:
-      return self.hashAndsave(encodeLeafNode(value))
+      return self.saveLeaf(value)
   of KV_TYPE:     # node is a key-value node
     checkBadKeyPath()
     return self.setKVNode(keyPath, nodeHash, node, value, deleteSubtrie)
@@ -152,7 +163,7 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   # Compress branch node into kv node
   if newLeftChild == BLANK_HASH or newRightChild == BLANK_HASH:
     let key = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
-    var subNode = parseNode(self.queryDB(key))
+    var subNode = self.fetchNode(key)
     var firstBit = newRightChild != BLANK_HASH
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
@@ -160,15 +171,13 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
       # exploit subNode.keyPath unused prefix bit
       # to avoid bitVector concat
       subNode.keyPath.pushFront(firstBit)
-      let node = encodeKVNode(subNode.keyPath, subNode.child)
-      result = self.hashAndSave(node)
+      result = self.saveKV(subNode.keyPath, subNode.child)
     # kv node pointing to a branch node
     elif subNode.kind in {BRANCH_TYPE, LEAF_TYPE}:
       let childNode = if firstBit: newRightChild else: newLeftChild
-      let node = encodeKVNode(firstBit, childNode)
-      result = self.hashAndSave(node)
+      result = self.saveKV(firstBit, childNode)
   else:
-    result = self.hashAndSave(encodeBranchNode(newLeftChild, newRightChild))
+    result = self.saveBranch(newLeftChild, newRightChild)
 
 proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   node: TrieNode, value: BytesRange, deleteSubtrie = false): TrieNodeKey =
@@ -186,14 +195,14 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
     # If child is empty
     if subNodeHash == BLANK_HASH:
       return BLANK_HASH
-    let subNode = parseNode(self.queryDB(subNodeHash))
+    let subNode = self.fetchNode(subNodeHash)
 
     # If the child is a key-value node, compress together the keyPaths
     # into one node
     if subNode.kind == KV_TYPE:
-      return self.hashAndSave(encodeKVNode(node.keyPath & subNode.keyPath, subNode.child))
+      return self.saveKV(node.keyPath & subNode.keyPath, subNode.child)
     else:
-      return self.hashAndSave(encodeKVNode(node.keyPath, subNodeHash))
+      return self.saveKV(node.keyPath, subNodeHash)
   # keyPath prefixes don't match. Here we will be converting a key-value node
   # of the form (k, CHILD) into a structure of one of the following forms:
   # 1.    (k[:-1], (NEWCHILD, CHILD))
@@ -214,14 +223,13 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
     # valnode: the child node that has the new value we are adding
     # Case 1: keyPath prefixes almost match, so we are in case (1), (2), (5), (6)
     if keyPath.len == commonPrefixLen + 1:
-      valNode = self.hashAndSave(encodeLeafNode(value))
+      valNode = self.saveLeaf(value)
     # Case 2: keyPath prefixes mismatch in the middle, so we need to break
     # the keyPath in half. We are in case (3), (4), (7), (8)
     else:
       if keyPath.len <= commonPrefixLen:
         raise newException(NodeOverrideError, overrideErrorMsg)
-      let nnode = encodeKVNode(keyPath[(commonPrefixLen + 1)..^1], self.hashAndSave(encodeLeafNode(value)))
-      valNode = self.hashAndSave(nnode)
+      valNode = self.saveKV(keyPath[(commonPrefixLen + 1)..^1], self.saveLeaf(value))
 
     # oldnode: the child node the has the old child value
     # Case 1: (1), (3), (5), (6)
@@ -229,21 +237,21 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
       oldNode = node.child
     # (2), (4), (6), (8)
     else:
-      oldNode = self.hashAndSave(encodeKVNode(node.keyPath[(commonPrefixLen + 1)..^1], node.child))
+      oldNode = self.saveKV(node.keyPath[(commonPrefixLen + 1)..^1], node.child)
 
     # Create the new branch node (because the key paths diverge, there has to
     # be some "first bit" at which they diverge, so there must be a branch
     # node somewhere)
     if keyPath[commonPrefixLen]: # first bit == 1
-      newSub = self.hashAndSave(encodeBranchNode(oldNode, valNode))
+      newSub = self.saveBranch(oldNode, valNode)
     else:
-      newSub = self.hashAndSave(encodeBranchNode(valNode, oldNode))
+      newSub = self.saveBranch(valNode, oldNode)
 
     # Case 1: keyPath prefixes match in the first bit, so we still need
     # a kv node at the top
     # (1) (2) (3) (4)
     if commonPrefixLen != 0:
-      return self.hashAndSave(encodeKVNode(node.keyPath[0..<commonPrefixLen], newSub))
+      return self.saveKV(node.keyPath[0..<commonPrefixLen], newSub)
     # Case 2: keyPath prefixes diverge in the first bit, so we replace the
     # kv node with a branch node
     # (5) (6) (7) (8)
