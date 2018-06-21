@@ -63,10 +63,10 @@ proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): Byt
   elif node.kind == BRANCH_TYPE:
     # keyPath too short
     if keyPath.len == 0: return zeroBytesRange
-    if keyPath[0] == false:
-      return self.getAux(node.leftChild, keyPath.sliceToEnd(1))
-    else:
+    if keyPath[0]: # first bit == 1
       return self.getAux(node.rightChild, keyPath.sliceToEnd(1))
+    else:
+      return self.getAux(node.leftChild, keyPath.sliceToEnd(1))
 
 proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
   var keyBits = MutByteRange(key.toRange).bits
@@ -94,44 +94,41 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   ## and traverse til the end of keyPath, then delete the whole subtrie of that node.
   ## Note: keyPath should be in binary array format, i.e., encoded by encode_to_bin()
 
+  template checkBadKeyPath(): untyped =
+    # keyPath too short
+    if keyPath.len == 0:
+      if deleteSubtrie: return BLANK_HASH
+      else: raise newException(NodeOverrideError, overrideErrorMsg)
+
+  template ifGoodValue(body: untyped): untyped =
+    if value.len != 0: body
+    else: return BLANK_HASH
+
   # Empty trie
   if nodeHash == BLANK_HASH:
-    if value.len != 0:
+    ifGoodValue:
       let node = encodeKVNode(keyPath, self.hashAndsave(encodeLeafNode(value)))
       return self.hashAndsave(node)
-    else:
-      return BLANK_HASH
 
   let node = parseNode(self.queryDB(nodeHash))
 
-  # Node is a leaf node
-  if node.kind == LEAF_TYPE:
+  case node.kind
+  of LEAF_TYPE:   # Node is a leaf node
     # keyPath must match, there should be no remaining keyPath
     if keyPath.len != 0:
       raise newException(NodeOverrideError, overrideErrorMsg)
     if deleteSubtrie: return BLANK_HASH
 
-    if value.len != 0:
+    ifGoodValue:
       return self.hashAndsave(encodeLeafNode(value))
-    else:
-      return BLANK_HASH
-  # node is a key-value node
-  elif node.kind == KV_TYPE:
-    # keyPath too short
-    if keyPath.len == 0:
-      if deleteSubtrie: return BLANK_HASH
-      else:
-        raise newException(NodeOverrideError, overrideErrorMsg)
+  of KV_TYPE:     # node is a key-value node
+    checkBadKeyPath()
     return self.setKVNode(keyPath, nodeHash, node, value, deleteSubtrie)
-  # node is a branch node
-  elif node.kind == BRANCH_TYPE:
-    # keyPath too short
-    if keyPath.len == 0:
-      if deleteSubtrie: return BLANK_HASH
-      else:
-        raise newException(NodeOverrideError, overrideErrorMsg)
+  of BRANCH_TYPE: # node is a branch node
+    checkBadKeyPath()
     return self.setBranchNode(keyPath, node, value, deleteSubtrie)
-  raise newException(Exception, "Invariant: This shouldn't ever happen")
+  else:
+    raise newException(Exception, "Invariant: This shouldn't ever happen")
 
 proc set*(self: var BinaryTrie, key, value: distinct BytesContainer) {.inline.} =
   ## Sets the value at the given keyPath from the given node
@@ -145,12 +142,12 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
   # Which child node to update? Depends on first bit in keyPath
   var newLeftChild, newRightChild: TrieNodeKey
 
-  if keyPath[0] == false:
-    newLeftChild  = self.setAux(node.leftChild, keyPath[1..^1], value, deleteSubtrie)
-    newRightChild = node.rightChild
-  else:
+  if keyPath[0]: # first bit == 1
     newRightChild = self.setAux(node.rightChild, keyPath[1..^1], value, deleteSubtrie)
     newLeftChild  = node.leftChild
+  else:
+    newLeftChild  = self.setAux(node.leftChild, keyPath[1..^1], value, deleteSubtrie)
+    newRightChild = node.rightChild
 
   # Compress branch node into kv node
   if newLeftChild == BLANK_HASH or newRightChild == BLANK_HASH:
@@ -237,7 +234,7 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
     # Create the new branch node (because the key paths diverge, there has to
     # be some "first bit" at which they diverge, so there must be a branch
     # node somewhere)
-    if keyPath[commonPrefixLen] == true:
+    if keyPath[commonPrefixLen]: # first bit == 1
       newSub = self.hashAndSave(encodeBranchNode(oldNode, valNode))
     else:
       newSub = self.hashAndSave(encodeBranchNode(valNode, oldNode))
