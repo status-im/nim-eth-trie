@@ -2,14 +2,16 @@ import
   nimcrypto/[keccak, hash],
   ranges/[ptr_arith, typedranges, bitranges],
   rlp/types as rlpTypes,
-  types, binaries, utils
+  types, constants, binaries, utils
 
 export
   types, keccak, hash, rlpTypes, utils
 
 type
-  BinaryTrie*[DB: TrieDatabase] = object
-    dbLink: ref DB
+  DB = TrieDatabaseRef
+
+  BinaryTrie* = object
+    db: DB
     rootHash: TrieNodeKey
 
   NodeOverrideError* = object of Exception
@@ -17,34 +19,34 @@ type
   BytesContainer* = BytesRange | Bytes | string
 
 let
-  BLANK_HASH*     = hashFromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470").toTrieNodeKey
-  zeroBytesRange* = Range[byte]()
+  blankHash* = blankStringHash.toTrieNodeKey
 
-proc init*[DB](x: typedesc[BinaryTrie[DB]], db: ref DB,
-  rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
-  result.dbLink = db
+proc init*(x: typedesc[BinaryTrie], db: DB,
+           rootHash: BytesContainer | KeccakHash = blankHash): BinaryTrie =
+  result.db = db
   when rootHash.type isnot KeccakHash:
     assert(rootHash.len == 32)
   result.rootHash = toRange(rootHash)
 
-proc initBinaryTrie*[DB](db: ref DB,
-  rootHash: BytesContainer | KeccakHash = BLANK_HASH): BinaryTrie[DB] =
-  init(BinaryTrie[DB], db, rootHash)
+proc getDB*(t: BinaryTrie): auto = t.db
+
+proc initBinaryTrie*(db: DB, rootHash: BytesContainer | KeccakHash): BinaryTrie =
+  init(BinaryTrie, db, rootHash)
+
+proc initBinaryTrie*(db: DB): BinaryTrie =
+  init(BinaryTrie, db, blankHash)
 
 proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
   self.rootHash
 
-proc getDB*[DB](self: BinaryTrie[DB]): ref DB {.inline.} =
-  self.dbLink
-
 template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
   # perhaps the underlying DB should accept BytesRange too
   # to avoid toHash conversion
-  parseNode(self.dbLink[].get(toHash(nodeHash)).toRange)
+  parseNode self.db.get(toHash(nodeHash)).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
-  if nodeHash == BLANK_HASH:
+  if nodeHash == blankHash:
     return zeroBytesRange
 
   let node = self.fetchNode(nodeHash)
@@ -79,7 +81,7 @@ proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   # and the underlying DB can accept BytesRange too
   # therefore we can avoid conversion
   let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
-  discard self.dbLink[].put(nodeHash, node)
+  discard self.db.put(nodeHash, node.toRange)
   result = toTrieNodeKey(nodeHash)
 
 template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
@@ -109,15 +111,15 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   template checkBadKeyPath(): untyped =
     # keyPath too short
     if keyPath.len == 0:
-      if deleteSubtrie: return BLANK_HASH
+      if deleteSubtrie: return blankHash
       else: raise newException(NodeOverrideError, overrideErrorMsg)
 
   template ifGoodValue(body: untyped): untyped =
     if value.len != 0: body
-    else: return BLANK_HASH
+    else: return blankHash
 
   # Empty trie
-  if nodeHash == BLANK_HASH:
+  if nodeHash == blankHash:
     ifGoodValue:
       return self.saveKV(keyPath, self.saveLeaf(value))
 
@@ -128,7 +130,7 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
     # keyPath must match, there should be no remaining keyPath
     if keyPath.len != 0:
       raise newException(NodeOverrideError, overrideErrorMsg)
-    if deleteSubtrie: return BLANK_HASH
+    if deleteSubtrie: return blankHash
 
     ifGoodValue:
       return self.saveLeaf(value)
@@ -161,10 +163,10 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
     newRightChild = node.rightChild
 
   # Compress branch node into kv node
-  if newLeftChild == BLANK_HASH or newRightChild == BLANK_HASH:
-    let key = if newLeftChild != BLANK_HASH: newLeftChild else: newRightChild
+  if newLeftChild == blankHash or newRightChild == blankHash:
+    let key = if newLeftChild != blankHash: newLeftChild else: newRightChild
     var subNode = self.fetchNode(key)
-    var firstBit = newRightChild != BLANK_HASH
+    var firstBit = newRightChild != blankHash
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
@@ -184,7 +186,7 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   # keyPath prefixes match
   if deleteSubtrie:
     if keyPath.len < node.keyPath.len and keyPath == node.keyPath[0..<keyPath.len]:
-      return BLANK_HASH
+      return blankHash
 
   let sliceLen = min(node.keyPath.len, keyPath.len)
 
@@ -193,8 +195,8 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
     let subNodeHash = self.setAux(node.child, keyPath.sliceToEnd(node.keyPath.len), value, deleteSubtrie)
 
     # If child is empty
-    if subNodeHash == BLANK_HASH:
-      return BLANK_HASH
+    if subNodeHash == blankHash:
+      return blankHash
     let subNode = self.fetchNode(subNodeHash)
 
     # If the child is a key-value node, compress together the keyPaths
@@ -276,7 +278,7 @@ proc deleteSubtrie*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
 
 # Convenience
 proc rootNode*(self: BinaryTrie): BytesRange {.inline.} =
-  self.queryDB(self.rootHash)
+  self.db.get(self.rootHash.toHash).toRange
 
 proc rootNode*(self: var BinaryTrie, node: BytesContainer) {.inline.} =
   self.rootHash = self.hashAndSave(toRange(node))

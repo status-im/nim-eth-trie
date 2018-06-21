@@ -4,7 +4,7 @@ import
 
 type
   MemDBTable = Table[KeccakHash, Bytes]
-  MemDB* = object
+  MemDB* = object of RootObj
     tbl: MemDBTable
 
 proc hash*(key: KeccakHash): int =
@@ -49,5 +49,5 @@ proc len*(db: MemDB): int =
   db.tbl.len
 
 static:
-  assert MemDB is TrieDatabase
+  assert MemDB is TrieDatabaseConcept
 

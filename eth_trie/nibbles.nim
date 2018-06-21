@@ -1,5 +1,5 @@
 import
-  rlp/types
+  rlp/types, constants
 
 type
   NibblesRange* = object
@@ -11,7 +11,8 @@ proc initNibbleRange*(bytes: BytesRange): NibblesRange =
   result.ibegin = 0
   result.iend = bytes.len * 2
 
-var zeroNibblesRange* = initNibbleRange(zeroBytesRange)
+const
+  zeroNibblesRange* = initNibbleRange(zeroBytesRange)
 
 proc `[]`*(r: NibblesRange, i: int): byte =
   let pos = r.ibegin + i
@@ -71,7 +72,7 @@ proc hexPrefixEncodeByte*(val: byte, isLeaf = false): byte =
   result = (((byte(isLeaf) * 2) + 1) shl 4) and val
 
 proc sharedPrefixLen*(lhs, rhs: NibblesRange): int =
-  var result = 0
+  result = 0
   while result < lhs.len and result < rhs.len:
     if lhs[result] != rhs[result]: break
     inc result

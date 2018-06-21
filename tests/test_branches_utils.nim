@@ -1,11 +1,11 @@
 import
-  eth_trie/[memdb, binary, branches], rlp/types,
+  eth_trie/[memdb, binary, branches, types],
   random, sets, unittest, strutils, sets
 
 suite "branches utils":
 
-  proc testTrie(): BinaryTrie[MemDB] =
-    var db = newMemDB()
+  proc testTrie(): BinaryTrie =
+    var db = trieDB newMemDB()
     var trie = initBinaryTrie(db)
 
     trie.set("\x12\x34\x56\x78\x9a", "9a")

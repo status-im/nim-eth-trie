@@ -1,6 +1,7 @@
 import
   os, json, tables, sequtils, strutils,
-  rlp/types, eth_trie, eth_trie/memdb
+  rlp/types as rlpTypes,
+  eth_trie/[hexary, types, memdb]
 
 proc hexRepr*(bytes: BytesRange): string =
   result = newStringOfCap(bytes.len * 2)
@@ -14,7 +15,7 @@ proc toBytesRange(str: string): BytesRange =
   var s = newSeq[byte](str.len)
   for i in 0 ..< str.len:
     s[i] = byte(str[i])
-  result = initBytesRange(s)
+  result = s.toRange
 
 proc runTests*(filename: string) =
   let js = json.parseFile(filename)
@@ -33,7 +34,7 @@ proc runTests*(filename: string) =
       root = testdata{"root"}
 
     var
-      db = newMemDB()
+      db = trieDB newMemDB()
       t = initTrie(db)
 
     if input.isNil or root.isNil or root.kind != JString:

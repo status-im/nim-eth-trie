@@ -138,11 +138,11 @@ Luckily, we also provide some utilities to deal with this situation, the branch 
 ## The branch utils
 
 The branch utils consist of these API:
- * checkIfBranchExist(ref DB; rootHash; keyPrefix): bool
- * getBranch(ref DB; rootHash; key): branch
+ * checkIfBranchExist(DB; rootHash; keyPrefix): bool
+ * getBranch(DB; rootHash; key): branch
  * isValidBranch(branch, rootHash, key, value): bool
- * getWitness(ref DB; nodeHash; key): branch
- * getTrieNodes(ref DB; nodeHash): branch
+ * getWitness(DB; nodeHash; key): branch
+ * getTrieNodes(DB; nodeHash): branch
 
 `keyPrefix`, `key`, and `value` are bytes container with length greater than zero.
 They can be BytesRange, Bytes, and string(again, for convenience and testing purpose).

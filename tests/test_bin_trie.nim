@@ -1,5 +1,5 @@
 import
-  eth_trie/[memdb, binary],
+  eth_trie/[memdb, binary, constants, types],
   unittest, test_utils, random
 
 suite "binary trie":
@@ -7,9 +7,9 @@ suite "binary trie":
   test "different order insert":
     randomize()
     var kv_pairs = randKVPair()
-    var result = BLANK_HASH
+    var result = blankHash
     for _ in 0..<1: # repeat 3 times
-      var db = newMemDB()
+      var db = trieDB newMemDB()
       var trie = initBinaryTrie(db)
       random.shuffle(kv_pairs)
 
@@ -19,7 +19,7 @@ suite "binary trie":
         let y = toRange(c.value)
         check y == x
 
-      check result == BLANK_HASH or trie.getRootHash() == result
+      check result == blankHash or trie.getRootHash() == result
       result = trie.getRootHash()
 
       # insert already exist key/value
@@ -30,7 +30,7 @@ suite "binary trie":
       random.shuffle(kv_pairs)
       for i, c in kv_pairs:
         trie.delete(c.key)
-      check trie.getRootHash() == BLANK_HASH
+      check trie.getRootHash() == blankHash
 
   const delSubtrieData = [
     (("\x12\x34\x56\x78", "78"), ("\x12\x34\x56\x79", "79"), "\x12\x34\x56", true, false),
@@ -41,7 +41,7 @@ suite "binary trie":
 
   test "delete subtrie":
     for data in delSubtrieData:
-      var db = newMemDB()
+      var db = trieDB newMemDB()
       var trie = initBinaryTrie(db)
 
       let kv1 = data[0]
@@ -60,7 +60,7 @@ suite "binary trie":
         trie.deleteSubtrie(key_to_be_deleted)
         check trie.get(kv1[0]) == zeroBytesRange
         check trie.get(kv2[0]) == zeroBytesRange
-        check trie.getRootHash() == BLANK_HASH
+        check trie.getRootHash() == blankHash
       else:
         if will_raise_error:
           try:
@@ -86,7 +86,7 @@ suite "binary trie":
 
   test "invalid key":
    for data in invalidKeyData:
-      var db = newMemDB()
+      var db = trieDB newMemDB()
       var trie = initBinaryTrie(db)
 
       trie.set("\x12\x34\x56\x78", "78")
@@ -112,7 +112,7 @@ suite "binary trie":
   test "update value":
     let keys = randList(string, randGen(32, 32), randGen(100, 100))
     let vals = randList(int, randGen(0, 99), randGen(50, 50))
-    var db = newMemDB()
+    var db = trieDB newMemDB()
     var trie = initBinaryTrie(db)
     for key in keys:
       trie.set(key, "old")
