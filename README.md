@@ -100,7 +100,7 @@ and then you want to continue/resume the trie operations.
 
 ```Nim
 import
-  [[eth_trie/[memdb,]] binary, utils]
+  eth_trie/[memdb, binary, utils]
 
 var db = newMemDB()
 var trie = initBinaryTrie(db)
@@ -228,8 +228,8 @@ assert nodes.len == wholeTrie.len - 1
 ## Remember the lie?
 
 Because trie `delete`, `deleteSubtrie` and `set` operation create inaccessible nodes in the underlying DB,
-we need to remove them if necessary. We already see that `branch = getWitness(db, trie.getRootHash(), "")`
-will return the whole trie, but only the accessible nodes.
+we need to remove them if necessary. We already see that `wholeTrie = getWitness(db, trie.getRootHash(), "")`
+will return the whole trie, a list of accessible nodes.
 Then we can write the clean tree into a new DB instance to replace the old one.
 
 
