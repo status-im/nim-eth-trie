@@ -21,14 +21,10 @@ type
 let
   zeroHash* = zeroBytesRange
 
-template isZeroHash(x: BytesRange): bool =
-  x.len == 0
-
 proc init*(x: typedesc[BinaryTrie], db: DB,
            rootHash: BytesContainer | KeccakHash = zeroHash): BinaryTrie =
+  checkValidHashZ(rootHash)
   result.db = db
-  when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32 or rootHash.len == 0)
   result.rootHash = toRange(rootHash)
 
 proc getDB*(t: BinaryTrie): auto = t.db
