@@ -19,13 +19,16 @@ type
   BytesContainer* = BytesRange | Bytes | string
 
 let
-  blankHash* = blankStringHash.toTrieNodeKey
+  zeroHash* = zeroBytesRange
+
+template isZeroHash(x: BytesRange): bool =
+  x.len == 0
 
 proc init*(x: typedesc[BinaryTrie], db: DB,
-           rootHash: BytesContainer | KeccakHash = blankHash): BinaryTrie =
+           rootHash: BytesContainer | KeccakHash = zeroHash): BinaryTrie =
   result.db = db
   when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32)
+    assert(rootHash.len == 32 or rootHash.len == 0)
   result.rootHash = toRange(rootHash)
 
 proc getDB*(t: BinaryTrie): auto = t.db
@@ -34,7 +37,7 @@ proc initBinaryTrie*(db: DB, rootHash: BytesContainer | KeccakHash): BinaryTrie 
   init(BinaryTrie, db, rootHash)
 
 proc initBinaryTrie*(db: DB): BinaryTrie =
-  init(BinaryTrie, db, blankHash)
+  init(BinaryTrie, db, zeroHash)
 
 proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
   self.rootHash
@@ -46,7 +49,7 @@ template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
-  if nodeHash == blankHash:
+  if isZeroHash(nodeHash):
     return zeroBytesRange
 
   let node = self.fetchNode(nodeHash)
@@ -111,15 +114,15 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
   template checkBadKeyPath(): untyped =
     # keyPath too short
     if keyPath.len == 0:
-      if deleteSubtrie: return blankHash
+      if deleteSubtrie: return zeroHash
       else: raise newException(NodeOverrideError, overrideErrorMsg)
 
   template ifGoodValue(body: untyped): untyped =
     if value.len != 0: body
-    else: return blankHash
+    else: return zeroHash
 
   # Empty trie
-  if nodeHash == blankHash:
+  if isZeroHash(nodeHash):
     ifGoodValue:
       return self.saveKV(keyPath, self.saveLeaf(value))
 
@@ -130,7 +133,7 @@ proc setAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange,
     # keyPath must match, there should be no remaining keyPath
     if keyPath.len != 0:
       raise newException(NodeOverrideError, overrideErrorMsg)
-    if deleteSubtrie: return blankHash
+    if deleteSubtrie: return zeroHash
 
     ifGoodValue:
       return self.saveLeaf(value)
@@ -162,11 +165,14 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
     newLeftChild  = self.setAux(node.leftChild, keyPath[1..^1], value, deleteSubtrie)
     newRightChild = node.rightChild
 
+  let blankRight = isZeroHash(newRightChild)
+
   # Compress branch node into kv node
-  if newLeftChild == blankHash or newRightChild == blankHash:
-    let key = if newLeftChild != blankHash: newLeftChild else: newRightChild
-    var subNode = self.fetchNode(key)
-    var firstBit = newRightChild != blankHash
+  if blankRight or isZeroHash(newLeftChild):
+    let
+      firstBit  = not blankRight
+      childNode = if firstBit: newRightChild else: newLeftChild
+    var subNode = self.fetchNode(childNode)
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
@@ -176,7 +182,6 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
       result = self.saveKV(subNode.keyPath, subNode.child)
     # kv node pointing to a branch node
     elif subNode.kind in {BRANCH_TYPE, LEAF_TYPE}:
-      let childNode = if firstBit: newRightChild else: newLeftChild
       result = self.saveKV(firstBit, childNode)
   else:
     result = self.saveBranch(newLeftChild, newRightChild)
@@ -186,17 +191,18 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   # keyPath prefixes match
   if deleteSubtrie:
     if keyPath.len < node.keyPath.len and keyPath == node.keyPath[0..<keyPath.len]:
-      return blankHash
+      return zeroHash
 
   let sliceLen = min(node.keyPath.len, keyPath.len)
 
   if keyPath[0..<sliceLen] == node.keyPath:
     # Recurse into child
-    let subNodeHash = self.setAux(node.child, keyPath.sliceToEnd(node.keyPath.len), value, deleteSubtrie)
+    let subNodeHash = self.setAux(node.child,
+      keyPath.sliceToEnd(node.keyPath.len), value, deleteSubtrie)
 
     # If child is empty
-    if subNodeHash == blankHash:
-      return blankHash
+    if isZeroHash(subNodeHash):
+      return zeroHash
     let subNode = self.fetchNode(subNodeHash)
 
     # If the child is a key-value node, compress together the keyPaths
@@ -216,7 +222,9 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
   # 7.    ((k[1:], CHILD), NEWCHILD)
   # 8.    (CHILD, (k[1:], NEWCHILD))
   else:
-    let commonPrefixLen = getCommonPrefixLength(node.keyPath, keyPath[0..<sliceLen])
+    let
+      commonPrefixLen = getCommonPrefixLength(node.keyPath, keyPath[0..<sliceLen])
+      cplenPlusOne    = commonPrefixLen + 1
     # New key-value pair can not contain empty value
     # Or one can not delete non-exist subtrie
     if value.len == 0 or deleteSubtrie: return nodeHash
@@ -224,22 +232,22 @@ proc setKVNode(self: BinaryTrie, keyPath: TrieBitRange, nodeHash: TrieNodeKey,
     var valNode, oldNode, newSub: TrieNodeKey
     # valnode: the child node that has the new value we are adding
     # Case 1: keyPath prefixes almost match, so we are in case (1), (2), (5), (6)
-    if keyPath.len == commonPrefixLen + 1:
+    if keyPath.len == cplenPlusOne:
       valNode = self.saveLeaf(value)
     # Case 2: keyPath prefixes mismatch in the middle, so we need to break
     # the keyPath in half. We are in case (3), (4), (7), (8)
     else:
       if keyPath.len <= commonPrefixLen:
         raise newException(NodeOverrideError, overrideErrorMsg)
-      valNode = self.saveKV(keyPath[(commonPrefixLen + 1)..^1], self.saveLeaf(value))
+      valNode = self.saveKV(keyPath[cplenPlusOne..^1], self.saveLeaf(value))
 
     # oldnode: the child node the has the old child value
     # Case 1: (1), (3), (5), (6)
-    if node.keyPath.len == commonPrefixLen + 1:
+    if node.keyPath.len == cplenPlusOne:
       oldNode = node.child
     # (2), (4), (6), (8)
     else:
-      oldNode = self.saveKV(node.keyPath[(commonPrefixLen + 1)..^1], node.child)
+      oldNode = self.saveKV(node.keyPath[cplenPlusOne..^1], node.child)
 
     # Create the new branch node (because the key paths diverge, there has to
     # be some "first bit" at which they diverge, so there must be a branch
