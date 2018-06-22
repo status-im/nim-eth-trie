@@ -1,5 +1,4 @@
 import
-  nimcrypto/[keccak, hash],
   ranges/[ptr_arith, typedranges, bitranges],
   rlp/types as rlpTypes,
   types, constants, binaries, utils
@@ -40,9 +39,8 @@ proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
   self.rootHash
 
 template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
-  # perhaps the underlying DB should accept BytesRange too
-  # to avoid toHash conversion
-  parseNode self.db.get(toHash(nodeHash)).toRange
+  let hash = cast[ptr KeccakHash](nodeHash.baseAddr)
+  parseNode self.db.get(hash[]).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
@@ -77,12 +75,10 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
   return self.getAux(self.rootHash, keyBits)
 
 proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
-  # perhaps nimcrypto digest can produce BytesRange too?
-  # and the underlying DB can accept BytesRange too
-  # therefore we can avoid conversion
-  let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
-  discard self.db.put(nodeHash, node.toRange)
-  result = toTrieNodeKey(nodeHash)
+  result = newRange[byte](32)
+  keccak(node, MutRange[byte](result))
+  let hash = cast[ptr KeccakHash](result.baseAddr)
+  discard self.db.put(hash[], node.toRange)
 
 template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
   self.hashAndsave(encodeKVNode(keyPath, child))

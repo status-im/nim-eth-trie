@@ -1,6 +1,6 @@
 import
   rlp/types as rlpTypes, strutils,
-  nimcrypto/hash, parseutils, types, binaries,
+  nimcrypto/[hash, keccak], parseutils, types, binaries,
   ranges/ptr_arith
 
 proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
@@ -36,3 +36,10 @@ proc hashFromHex*(bits: static[int], input: string): MDigest[bits] =
 "The input string contains invalid characters")
 
 template hashFromHex*(s: static[string]): untyped = hashFromHex(s.len * 4, s)
+
+proc keccak*(input: BytesRange | Bytes, output: var MutRange[byte]) =
+  var ctx: keccak256
+  ctx.init()
+  ctx.update(input.baseAddr, uint(input.len))
+  ctx.finish output.toOpenArray
+  ctx.clear()
