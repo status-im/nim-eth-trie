@@ -7,7 +7,7 @@ suite "binary trie":
   test "different order insert":
     randomize()
     var kv_pairs = randKVPair()
-    var result = blankHash
+    var result = zeroHash
     for _ in 0..<1: # repeat 3 times
       var db = trieDB newMemDB()
       var trie = initBinaryTrie(db)
@@ -19,7 +19,7 @@ suite "binary trie":
         let y = toRange(c.value)
         check y == x
 
-      check result == blankHash or trie.getRootHash() == result
+      check result == zeroHash or trie.getRootHash() == result
       result = trie.getRootHash()
 
       # insert already exist key/value
@@ -30,7 +30,7 @@ suite "binary trie":
       random.shuffle(kv_pairs)
       for i, c in kv_pairs:
         trie.delete(c.key)
-      check trie.getRootHash() == blankHash
+      check trie.getRootHash() == zeroHash
 
   const delSubtrieData = [
     (("\x12\x34\x56\x78", "78"), ("\x12\x34\x56\x79", "79"), "\x12\x34\x56", true, false),
@@ -60,7 +60,7 @@ suite "binary trie":
         trie.deleteSubtrie(key_to_be_deleted)
         check trie.get(kv1[0]) == zeroBytesRange
         check trie.get(kv2[0]) == zeroBytesRange
-        check trie.getRootHash() == blankHash
+        check trie.getRootHash() == zeroHash
       else:
         if will_raise_error:
           try:

@@ -10,8 +10,9 @@ proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
   copyMem(result.baseAddr, hash.data.baseAddr, 32)
 
 proc toHash*(nodeHash: TrieNodeKey): KeccakHash =
-  assert(nodeHash.len == 32)
-  copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
+  assert(nodeHash.len == 32 or nodeHash.len == 0)
+  if nodeHash.len > 0:
+    copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
 
 template toRange*(hash: KeccakHash): BytesRange =
   toTrieNodeKey(hash)

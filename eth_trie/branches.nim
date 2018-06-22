@@ -11,7 +11,7 @@ template query(db: DB, nodeHash: TrieNodeKey): BytesRange =
   db.get(toHash(nodeHash)).toRange
 
 proc checkIfBranchExistImpl(db: DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitRange): bool =
-  if nodeHash == blankHash:
+  if nodeHash == zeroHash:
     return false
 
   let node = parseNode(db.query(nodeHash))
@@ -42,13 +42,13 @@ proc checkIfBranchExist*(db: DB; rootHash: BytesContainer | KeccakHash, keyPrefi
   ## Given a key prefix, return whether this prefix is
   ## the prefix of an existing key in the trie.
   when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32)
+    assert(rootHash.len == 32 or rootHash.len == 0)
 
   var keyPrefixBits = bits MutByteRange(keyPrefix.toRange)
   checkIfBranchExistImpl(db, toRange(rootHash), keyPrefixBits)
 
 proc getBranchImpl(db: DB; nodeHash: TrieNodeKey, keyPath: TrieBitRange, output: var seq[BytesRange]) =
-  if nodeHash == blankHash: return
+  if nodeHash == zeroHash: return
 
   let nodeVal = db.query(nodeHash)
   let node = parseNode(nodeVal)
@@ -85,14 +85,14 @@ proc getBranchImpl(db: DB; nodeHash: TrieNodeKey, keyPath: TrieBitRange, output:
 proc getBranch*(db: DB; rootHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##     Get a long-format Merkle branch
   when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32)
+    assert(rootHash.len == 32 or rootHash.len == 0)
   result = @[]
   var keyBits = bits MutByteRange(key.toRange)
   getBranchImpl(db, toRange(rootHash), keyBits, result)
 
 proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
   when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32)
+    assert(rootHash.len == 32 or rootHash.len == 0)
 
   # branch must not be empty
   assert(branch.len != 0)
@@ -132,7 +132,7 @@ proc getTrieNodesImpl(db: DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]
 
 proc getTrieNodes*(db: DB; nodeHash: BytesContainer | KeccakHash): seq[BytesRange] =
   when nodeHash.type isnot KeccakHash:
-    assert(nodeHash.len == 32)
+    assert(nodeHash.len == 32 or nodeHash.len == 0)
   result = @[]
   discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
@@ -174,7 +174,7 @@ proc getWitness*(db: DB; nodeHash: BytesContainer | KeccakHash; key: BytesContai
   ##  1. witness along the keyPath and
   ##  2. witness in the subtrie of the last node in keyPath
   when nodeHash.type isnot KeccakHash:
-    assert(nodeHash.len == 32)
+    assert(nodeHash.len == 32 or nodeHash.len == 0)
   result = @[]
   var keyBits = bits MutByteRange(key.toRange)
   getWitnessImpl(db, toRange(nodeHash), keyBits, result)
