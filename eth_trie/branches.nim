@@ -1,7 +1,7 @@
 import
   nimcrypto/[keccak, hash],
   rlp/types as rlpTypes, ranges/bitranges,
-  binary, binaries, memdb, types
+  binary, binaries, memdb, types, utils
 
 type
   DB = TrieDatabaseRef
@@ -41,9 +41,7 @@ proc checkIfBranchExistImpl(db: DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitRan
 proc checkIfBranchExist*(db: DB; rootHash: BytesContainer | KeccakHash, keyPrefix: BytesContainer): bool =
   ## Given a key prefix, return whether this prefix is
   ## the prefix of an existing key in the trie.
-  when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32 or rootHash.len == 0)
-
+  checkValidHashZ(rootHash)
   var keyPrefixBits = bits MutByteRange(keyPrefix.toRange)
   checkIfBranchExistImpl(db, toRange(rootHash), keyPrefixBits)
 
@@ -84,16 +82,13 @@ proc getBranchImpl(db: DB; nodeHash: TrieNodeKey, keyPath: TrieBitRange, output:
 
 proc getBranch*(db: DB; rootHash: BytesContainer | KeccakHash; key: BytesContainer): seq[BytesRange] =
   ##     Get a long-format Merkle branch
-  when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32 or rootHash.len == 0)
+  checkValidHashZ(rootHash)
   result = @[]
   var keyBits = bits MutByteRange(key.toRange)
   getBranchImpl(db, toRange(rootHash), keyBits, result)
 
 proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHash, key, value: BytesContainer): bool =
-  when rootHash.type isnot KeccakHash:
-    assert(rootHash.len == 32 or rootHash.len == 0)
-
+  checkValidHashZ(rootHash)
   # branch must not be empty
   assert(branch.len != 0)
 
@@ -108,6 +103,8 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHa
 
 proc getTrieNodesImpl(db: DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]): bool =
   ## Get full trie of a given root node
+
+  if nodeHash.isZeroHash(): return false
 
   var nodeVal: BytesRange
   if toHash(nodeHash) in db:
@@ -131,14 +128,15 @@ proc getTrieNodesImpl(db: DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]
     raise newException(Exception, "Invariant: unreachable code path")
 
 proc getTrieNodes*(db: DB; nodeHash: BytesContainer | KeccakHash): seq[BytesRange] =
-  when nodeHash.type isnot KeccakHash:
-    assert(nodeHash.len == 32 or nodeHash.len == 0)
+  checkValidHashZ(nodeHash)
   result = @[]
   discard getTrieNodesImpl(db, toRange(nodeHash), result)
 
 proc getWitnessImpl*(db: DB; nodeHash: TrieNodeKey; keyPath: TrieBitRange; output: var seq[BytesRange]) =
   if keyPath.len == 0:
     if not getTrieNodesImpl(db, nodeHash, output): return
+
+  if nodeHash.isZeroHash(): return
 
   var nodeVal: BytesRange
   if toHash(nodeHash) in db:
@@ -173,8 +171,7 @@ proc getWitness*(db: DB; nodeHash: BytesContainer | KeccakHash; key: BytesContai
   ##
   ##  1. witness along the keyPath and
   ##  2. witness in the subtrie of the last node in keyPath
-  when nodeHash.type isnot KeccakHash:
-    assert(nodeHash.len == 32 or nodeHash.len == 0)
+  checkValidHashZ(nodeHash)
   result = @[]
   var keyBits = bits MutByteRange(key.toRange)
   getWitnessImpl(db, toRange(nodeHash), keyBits, result)
