@@ -37,9 +37,15 @@ proc hashFromHex*(bits: static[int], input: string): MDigest[bits] =
 
 template hashFromHex*(s: static[string]): untyped = hashFromHex(s.len * 4, s)
 
-proc keccak*(input: BytesRange | Bytes, output: var MutRange[byte]) =
+proc keccakHash*(input: BytesRange | Bytes): BytesRange =
+  var s = newSeq[byte](32)
   var ctx: keccak256
   ctx.init()
   ctx.update(input.baseAddr, uint(input.len))
-  ctx.finish output.toOpenArray
+  ctx.finish s
   ctx.clear()
+  result = toRange(s)
+
+template toKeccakPtr*(x: BytesRange): ptr KeccakHash =
+  assert(x.len == 32)
+  cast[ptr KeccakHash](x.baseAddr)
