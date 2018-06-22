@@ -4,7 +4,7 @@ import
   types, constants, binaries, utils
 
 export
-  types, keccak, hash, rlpTypes, utils
+  types, rlpTypes, utils
 
 type
   DB = TrieDatabaseRef
@@ -38,8 +38,8 @@ proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
   self.rootHash
 
 template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
-  let hash = cast[ptr KeccakHash](nodeHash.baseAddr)
-  parseNode self.db.get(hash[]).toRange
+  assert(nodeHash.len == 32)
+  parseNode self.db.get(toKeccakPtr(nodeHash)[]).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
@@ -74,10 +74,8 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
   return self.getAux(self.rootHash, keyBits)
 
 proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
-  result = newRange[byte](32)
-  keccak(node, MutRange[byte](result))
-  let hash = cast[ptr KeccakHash](result.baseAddr)
-  discard self.db.put(hash[], node.toRange)
+  result = keccakHash(node)
+  discard self.db.put(toKeccakPtr(result)[], node.toRange)
 
 template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
   self.hashAndsave(encodeKVNode(keyPath, child))
