@@ -14,12 +14,14 @@ proc initNibbleRange*(bytes: BytesRange): NibblesRange =
 const
   zeroNibblesRange* = initNibbleRange(zeroBytesRange)
 
-proc `[]`*(r: NibblesRange, i: int): byte =
-  let pos = r.ibegin + i
+proc `{}`(r: NibblesRange, pos: int): byte {.inline.} =
+  ## This is a helper for a more raw access to the nibbles.
+  ## It works with absolute positions.
   if pos > r.iend: raise newException(RangeError, "index out of range")
-
   return if (pos and 1) != 0: (r.bytes[pos div 2] and 0xf)
          else: (r.bytes[pos div 2] shr 4)
+
+template `[]`*(r: NibblesRange, i: int): byte = r{r.ibegin + i}
 
 proc len*(r: NibblesRange): int =
   r.iend - r.ibegin
@@ -33,12 +35,20 @@ proc `==`*(lhs, rhs: NibblesRange): bool =
   else:
     return false
 
+proc `$`*(r: NibblesRange): string =
+  result = newStringOfCap(100)
+  for i in r.ibegin ..< r.iend:
+    let n = int r{i}
+    let c = if n > 9: char(ord('a') + n)
+            else: char(ord('0') + n)
+    result.add c
+
 proc slice*(r: NibblesRange, ibegin: int, iend = -1): NibblesRange =
   result.bytes = r.bytes
   result.ibegin = r.ibegin + ibegin
   let e = if iend < 0: r.iend + iend + 1
-          else: r.ibegin + r.iend
-  assert ibegin >= 0 and e <= result.bytes.len
+          else: r.ibegin + iend
+  assert ibegin >= 0 and e <= result.bytes.len * 2
   result.iend = e
 
 template writeFirstByte(nibbleCountExpr) {.dirty.} =
@@ -50,7 +60,7 @@ template writeFirstByte(nibbleCountExpr) {.dirty.} =
 
 template writeNibbles(r) {.dirty.} =
   for i in r.ibegin ..< r.iend:
-    let nextNibble = r[i]
+    let nextNibble = r{i}
     if oddnessFlag:
       result[writeHead] = result[writeHead] or nextNibble
     else:
@@ -69,7 +79,7 @@ proc hexPrefixEncode*(r1, r2: NibblesRange, isLeaf = false): Bytes =
 
 proc hexPrefixEncodeByte*(val: byte, isLeaf = false): byte =
   assert val < 16
-  result = (((byte(isLeaf) * 2) + 1) shl 4) and val
+  result = (((byte(isLeaf) * 2) + 1) shl 4) or val
 
 proc sharedPrefixLen*(lhs, rhs: NibblesRange): int =
   result = 0
@@ -85,7 +95,7 @@ proc hexPrefixDecode*(r: BytesRange): tuple[isLeaf: bool, nibbles: NibblesRange]
   if r.len > 0:
     result.isLeaf = (r[0] and 0x20) != 0
     let hasOddLen = (r[0] and 0x10) != 0
-    result.nibbles.ibegin = 1 + int(hasOddLen)
+    result.nibbles.ibegin = 2 - int(hasOddLen)
   else:
     result.isLeaf = false
 

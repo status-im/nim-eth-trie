@@ -1,6 +1,6 @@
 import
   tables, hashes, rlp/types as rlpTypes,
-  eth_trie/types
+  eth_trie/types, nimcrypto/[hash, utils]
 
 type
   MemDBTable = Table[KeccakHash, Bytes]
