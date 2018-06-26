@@ -39,7 +39,7 @@ proc getRootHash*(self: BinaryTrie): TrieNodeKey {.inline.} =
 
 template fetchNode(self: BinaryTrie, nodeHash: TrieNodeKey): TrieNode =
   assert(nodeHash.len == 32)
-  parseNode self.db.get(toKeccakPtr(nodeHash)[]).toRange
+  parseNode self.db.get(nodeHash.toOpenArray).toRange
 
 proc getAux(self: BinaryTrie, nodeHash: TrieNodeKey, keyPath: TrieBitRange): BytesRange =
   # Empty trie
@@ -75,7 +75,7 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
 
 proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   result = keccakHash(node)
-  discard self.db.put(toKeccakPtr(result)[], node.toRange)
+  discard self.db.put(result.toOpenArray, node.toRange.toOpenArray)
 
 template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
   self.hashAndsave(encodeKVNode(keyPath, child))
@@ -276,7 +276,7 @@ proc deleteSubtrie*(self: var BinaryTrie, key: BytesContainer) {.inline.} =
 
 # Convenience
 proc rootNode*(self: BinaryTrie): BytesRange {.inline.} =
-  self.db.get(self.rootHash.toHash).toRange
+  self.db.get(self.rootHash.toOpenArray).toRange
 
 proc rootNode*(self: var BinaryTrie, node: BytesContainer) {.inline.} =
   self.rootHash = self.hashAndSave(toRange(node))

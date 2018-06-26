@@ -8,7 +8,7 @@ type
   InvalidKeyError* = object of Exception
 
 template query(db: DB, nodeHash: TrieNodeKey): BytesRange =
-  db.get(toHash(nodeHash)).toRange
+  db.get(nodeHash.toOpenArray).toRange
 
 proc checkIfBranchExistImpl(db: DB; nodeHash: TrieNodeKey; keyPrefix: TrieBitRange): bool =
   if nodeHash == zeroHash:
@@ -96,7 +96,7 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHa
   for node in branch:
     assert(node.len != 0)
     let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
-    discard db.put(nodeHash, node)
+    discard db.put(nodeHash.data, node.toOpenArray)
 
   var trie = initBinaryTrie(db, rootHash)
   result = trie.get(key) == toRange(value)
@@ -107,7 +107,7 @@ proc getTrieNodesImpl(db: DB; nodeHash: TrieNodeKey, output: var seq[BytesRange]
   if nodeHash.isZeroHash(): return false
 
   var nodeVal: BytesRange
-  if toHash(nodeHash) in db:
+  if nodeHash.toOpenArray in db:
     nodeVal = db.query(nodeHash)
   else:
     return false
@@ -139,7 +139,7 @@ proc getWitnessImpl*(db: DB; nodeHash: TrieNodeKey; keyPath: TrieBitRange; outpu
   if nodeHash.isZeroHash(): return
 
   var nodeVal: BytesRange
-  if toHash(nodeHash) in db:
+  if nodeHash.toOpenArray in db:
     nodeVal = db.query(nodeHash)
   else:
     return

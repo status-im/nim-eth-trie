@@ -15,10 +15,10 @@ type
 # XXX: poor's man vtref types
 
 type
-  PutProc = proc (db: RootRef, key: KeccakHash, data: BytesRange): bool
-  GetProc = proc (db: RootRef, key: KeccakHash): Bytes
-  DelProc = proc (db: RootRef, key: KeccakHash): bool
-  ContainsProc = proc (db: RootRef, key: KeccakHash): bool
+  PutProc = proc (db: RootRef, key, val: openarray[byte]): bool
+  GetProc = proc (db: RootRef, key: openarray[byte]): Bytes
+  DelProc = proc (db: RootRef, key: openarray[byte]): bool
+  ContainsProc = proc (db: RootRef, key: openarray[byte]): bool
 
   TrieDatabaseRef* = object
     obj: RootRef
@@ -27,22 +27,22 @@ type
     delProc: DelProc
     containsProc: ContainsProc
 
-proc putImpl[T](db: RootRef, key: KeccakHash, data: BytesRange): bool =
+proc putImpl[T](db: RootRef, key, val: openarray[byte]): bool =
   type DBRef = ref T
   mixin put
-  return put(DBRef(db)[], key, data)
+  return put(DBRef(db)[], key, val)
 
-proc getImpl[T](db: RootRef, key: KeccakHash): Bytes =
+proc getImpl[T](db: RootRef, key: openarray[byte]): Bytes =
   type DBRef = ref T
   mixin get
   return get(DBRef(db)[], key)
 
-proc delImpl[T](db: RootRef, key: KeccakHash): bool =
+proc delImpl[T](db: RootRef, key: openarray[byte]): bool =
   type DBRef = ref T
   mixin del
   return del(DBRef(db)[], key)
 
-proc containsImpl[T](db: RootRef, key: KeccakHash): bool =
+proc containsImpl[T](db: RootRef, key: openarray[byte]): bool =
   type DBRef = ref T
   mixin contains
   return contains(DBRef(db)[], key)
@@ -55,14 +55,15 @@ proc trieDB*[T](x: ref T): TrieDatabaseRef =
   result.delProc = delImpl[T]
   result.containsProc = containsImpl[T]
 
-proc put*(db: TrieDatabaseRef, key: KeccakHash, data: BytesRange): bool =
-  return (db.putProc)(db.obj, key, data)
+proc put*(db: TrieDatabaseRef, key, val: openarray[byte]): bool =
+  return (db.putProc)(db.obj, key, val)
 
-proc get*(db: TrieDatabaseRef, key: KeccakHash): Bytes =
+proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes =
   return (db.getProc)(db.obj, key)
 
-proc del*(db: TrieDatabaseRef, key: KeccakHash): bool =
+proc del*(db: TrieDatabaseRef, key: openarray[byte]): bool =
   return (db.delProc)(db.obj, key)
 
-proc contains*(db: TrieDatabaseRef, key: KeccakHash): bool =
+proc contains*(db: TrieDatabaseRef, key: openarray[byte]): bool =
   return db.containsProc(db.obj, key)
+
