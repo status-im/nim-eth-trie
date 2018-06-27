@@ -131,14 +131,12 @@ proc get*(self: HexaryTrie; key: BytesRange): BytesRange =
   return getAuxByHash(self.db, self.root, initNibbleRange(key))
 
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
-  if data.len > 32: discard t.db.del(data.keccak.data)
+  if data.len > 32: t.db.del(data.keccak.data)
 
 proc dbPut(db: DB, data: BytesRange): TrieNodeKey =
   result.hash = data.keccak
   result.usedBytes = 32
-  if not put(db, result.asDbKey, data.toOpenArray):
-    raise newException(PersistenceFailure,
-                       "Failed to write " & $data.len & " bytes to the database")
+  put(db, result.asDbKey, data.toOpenArray)
 
 proc appendAndSave(rlpWriter: var RlpWriter, data: BytesRange, db: DB) =
   if data.len >= 32:
@@ -224,7 +222,7 @@ proc graft(self: var HexaryTrie; r: Rlp): BytesRange =
   if not value.isList:
     let nodeKey = value.expectHash
     var resolvedData = self.db.get(nodeKey.toOpenArray).toRange
-    discard self.db.del(nodeKey.toOpenArray)
+    self.db.del(nodeKey.toOpenArray)
     value = rlpFromBytes resolvedData
 
   assert value.listLen == 2
@@ -323,7 +321,7 @@ proc del*(self: var HexaryTrie; key: BytesRange) =
   var newRootBytes = self.deleteAt(rootRlp, initNibbleRange(key))
   if newRootBytes.len > 0:
     if rootBytes.len < 32:
-      discard self.db.del(self.root.asDbKey)
+      self.db.del(self.root.asDbKey)
     self.root = self.db.dbPut(newRootBytes)
 
 proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
@@ -346,16 +344,11 @@ proc mergeAtAux(self: var HexaryTrie, output: var RlpWriter, orig: Rlp,
   let b = self.mergeAt(resolved, key, value, not isRemovable)
   output.appendAndSave(b, self.db)
 
-template checkedDelete(db: DB, hash: KeccakHash) =
-  if not db.del(hash.data):
-    if false: raise newException(PersistenceFailure,
-                       "Failed to delete a node from the database")
-
 proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
              key: NibblesRange, value: BytesRange,
              isInline = false): BytesRange =
   template origWithNewValue: auto =
-    checkedDelete(self.db, origHash)
+    self.db.del(origHash.data)
     replaceValue(orig, key, value)
 
   if orig.isEmpty:
@@ -377,7 +370,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       self.mergeAtAux(r, origValue, key.slice(k.len), value)
       return r.finish()
 
-    checkedDelete(self.db, origHash)
+    self.db.del(origHash.data)
     if sharedNibbles > 0:
       # Split the extension node
       var bottom = initRlpList(2)
@@ -418,7 +411,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       return origWithNewValue()
 
     if isInline:
-      discard self.db.del(origHash.data)
+      self.db.del(origHash.data)
 
     let n = key[0]
     var i = 0
@@ -443,7 +436,7 @@ proc put*(self: var HexaryTrie; key, value: BytesRange) =
   let newRootBytes = self.mergeAt(rlpFromBytes(rootBytes), root,
                                   initNibbleRange(key), value)
   if rootBytes.len < 32:
-    discard self.db.del(root.data)
+    self.db.del(root.data)
 
   self.root = self.db.dbPut(newRootBytes)
 
