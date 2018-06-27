@@ -10,13 +10,8 @@ type
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
   db.tbl[@key]
 
-proc del*(db: var MemDB, key: openarray[byte]): bool =
-  let key = @key
-  if db.tbl.hasKey(key):
-    db.tbl.del(key)
-    return true
-  else:
-    return false
+proc del*(db: var MemDB, key: openarray[byte]) =
+  db.tbl.del(@key)
 
 proc contains*(db: MemDB, key: openarray[byte]): bool =
   db.tbl.hasKey(@key)
@@ -24,7 +19,7 @@ proc contains*(db: MemDB, key: openarray[byte]): bool =
 template printPair(k, v) =
   echo k.toHex, " = ", rlpFromBytes(v.toRange).inspect
 
-proc put*(db: var MemDB, key, val: openarray[byte]): bool =
+proc put*(db: var MemDB, key, val: openarray[byte]) =
   let
     k = @key
     v = @val
@@ -32,7 +27,6 @@ proc put*(db: var MemDB, key, val: openarray[byte]): bool =
   # printPair(k, v)
 
   db.tbl[k] = v
-  return true
 
 proc newMemDB*: ref MemDB =
   result = new(ref MemDB)

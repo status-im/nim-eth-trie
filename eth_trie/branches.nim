@@ -96,7 +96,7 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHa
   for node in branch:
     assert(node.len != 0)
     let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
-    discard db.put(nodeHash.data, node.toOpenArray)
+    db.put(nodeHash.data, node.toOpenArray)
 
   var trie = initBinaryTrie(db, rootHash)
   result = trie.get(key) == toRange(value)

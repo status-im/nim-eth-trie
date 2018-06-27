@@ -75,7 +75,7 @@ proc get*(self: BinaryTrie, key: BytesContainer): BytesRange {.inline.} =
 
 proc hashAndSave*(self: BinaryTrie, node: BytesRange | Bytes): TrieNodeKey =
   result = keccakHash(node)
-  discard self.db.put(result.toOpenArray, node.toRange.toOpenArray)
+  self.db.put(result.toOpenArray, node.toRange.toOpenArray)
 
 template saveKV(self: BinaryTrie, keyPath: TrieBitRange | bool, child: BytesRange): untyped =
   self.hashAndsave(encodeKVNode(keyPath, child))
