@@ -1,6 +1,6 @@
 import
   tables, hashes, rlp,
-  eth_trie/types, nimcrypto/[hash, utils]
+  eth_trie/types, nimcrypto/[hash, utils, keccak]
 
 type
   MemDBTable = Table[Bytes, Bytes]
@@ -28,9 +28,18 @@ proc put*(db: var MemDB, key, val: openarray[byte]) =
 
   db.tbl[k] = v
 
+proc keccak*(r: BytesRange): KeccakHash =
+  keccak256.digest r.toOpenArray
+
+let
+  # XXX: turning this into a constant leads to a compilation failure
+  emptyRlp = rlp.encode ""
+  emptyRlpHash = emptyRlp.keccak
+
 proc newMemDB*: ref MemDB =
   result = new(ref MemDB)
   result.tbl = initTable[Bytes, Bytes]()
+  put(result[], emptyRlpHash.data, emptyRlp.toOpenArray)
 
 proc `$`*(db: MemDB): string =
   for k, v in db.tbl:
