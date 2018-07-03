@@ -155,24 +155,22 @@ proc setBranchNode(self: BinaryTrie, keyPath: TrieBitRange, node: TrieNode,
     newLeftChild  = self.setAux(node.leftChild, keyPath[1..^1], value, deleteSubtrie)
     newRightChild = node.rightChild
 
-  let blankRight = isZeroHash(newRightChild)
+  let blankLeft = isZeroHash(newLeftChild)
 
   # Compress branch node into kv node
-  if blankRight or isZeroHash(newLeftChild):
-    let
-      firstBit  = not blankRight
-      childNode = if firstBit: newRightChild else: newLeftChild
+  if blankLeft or isZeroHash(newRightChild):
+    let childNode = if blankLeft: newRightChild else: newLeftChild
     var subNode = self.fetchNode(childNode)
 
     # Compress (k1, (k2, NODE)) -> (k1 + k2, NODE)
     if subNode.kind == KV_TYPE:
       # exploit subNode.keyPath unused prefix bit
       # to avoid bitVector concat
-      subNode.keyPath.pushFront(firstBit)
+      subNode.keyPath.pushFront(blankLeft)
       result = self.saveKV(subNode.keyPath, subNode.child)
     # kv node pointing to a branch node
     elif subNode.kind in {BRANCH_TYPE, LEAF_TYPE}:
-      result = self.saveKV(firstBit, childNode)
+      result = self.saveKV(blankLeft, childNode)
   else:
     result = self.saveBranch(newLeftChild, newRightChild)
 
