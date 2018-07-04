@@ -7,11 +7,32 @@ type
   MemDB* = object of RootObj
     tbl: MemDBTable
 
+proc keccak*(r: BytesRange): KeccakHash =
+  keccak256.digest r.toOpenArray
+
+let
+  # XXX: turning this into a constant leads to a compilation failure
+  emptyRlp = rlp.encode ""
+  emptyRlpHash = emptyRlp.keccak
+
+# XXX: This should be commited upstream
+proc `==` *[T](x, y: openarray[T]): bool =
+  if x.len != y.len:
+    return false
+
+  for f in low(x)..high(x):
+    if x[f] != y[f]:
+      return false
+
+  result = true
+
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
   db.tbl[@key]
 
 proc del*(db: var MemDB, key: openarray[byte]) =
-  db.tbl.del(@key)
+  # The database should ensure that the empty key is always active:
+  if key != emptyRlpHash.data:
+    db.tbl.del(@key)
 
 proc contains*(db: MemDB, key: openarray[byte]): bool =
   db.tbl.hasKey(@key)
@@ -27,14 +48,6 @@ proc put*(db: var MemDB, key, val: openarray[byte]) =
   # printPair(k, v)
 
   db.tbl[k] = v
-
-proc keccak*(r: BytesRange): KeccakHash =
-  keccak256.digest r.toOpenArray
-
-let
-  # XXX: turning this into a constant leads to a compilation failure
-  emptyRlp = rlp.encode ""
-  emptyRlpHash = emptyRlp.keccak
 
 proc newMemDB*: ref MemDB =
   result = new(ref MemDB)
