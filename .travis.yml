@@ -36,4 +36,7 @@ matrix:
         - cd ..
 
       script:
-        - nimble install -dy && nimble test
+        - nimble install -dy
+        - nimble testDebug
+        - nimble testRelease
+
