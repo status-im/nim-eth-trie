@@ -19,7 +19,11 @@ proc configForTests() =
   --path: "."
   --run
 
-task test, "run CPU tests":
+task testDebug, "test debug mode":
   configForTests()
   setCommand "c", "tests/all.nim"
 
+task testRelease, "test release mode":
+  configForTests()
+  switch("define", "release")
+  setCommand "c", "tests/all.nim"

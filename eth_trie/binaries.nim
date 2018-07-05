@@ -82,7 +82,9 @@ proc encodeKVNode*(keyPath: TrieBitRange, childHash: TrieNodeKey): Bytes =
   ## Serializes a key/value node
   if keyPath.len == 0:
     raise newException(ValidationError, "Key path can not be empty")
-  assert(childHash.len == 32)
+
+  if childHash.len != 32:
+    raise newException(ValidationError, "Invalid hash len")
 
   # Encodes a sequence of 0s and 1s into tightly packed bytes
   # Used in encoding key path of a KV-NODE
@@ -121,8 +123,8 @@ proc encodeBranchNode*(leftChildHash, rightChildHash: TrieNodeKey): Bytes =
   const
     BRANCH_TYPE_PREFIX = @[BRANCH_TYPE.byte]
 
-  assert(leftChildHash.len == 32)
-  assert(rightChildHash.len == 32)
+  if leftChildHash.len != 32 or rightChildHash.len != 32:
+    raise newException(ValidationError, "encodeBranchNode: Invalid hash len")
 
   result = BRANCH_TYPE_PREFIX.concat(leftChildHash, rightChildHash)
 

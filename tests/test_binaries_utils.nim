@@ -36,51 +36,51 @@ suite "binaries utils":
     None = ""
     parseNodeData = {
       "\x00\x03\x04\x05\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p":
-        (0, "00110000010000000101", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
+        (0, "00110000010000000101", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", false),
       "\x01\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p":
-        (1, "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
-      "\x02value": (2, None, "value"),
-      "": (0, None, None),
-      "\x00\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p": (0, None, None),
-      "\x01\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p": (0, None, None),
+        (1, "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", false),
+      "\x02value": (2, None, "value", false),
+      "": (0, None, None, true),
+      "\x00\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p": (0, None, None, true),
+      "\x01\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p": (0, None, None, true),
       "\x01\x02\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p":
-        (0, None, None),
-      "\x02": (0, None, None),
-      "\x03": (0, None, None)
+        (0, None, None, true),
+      "\x02": (0, None, None, true),
+      "\x03": (0, None, None, true)
     }
 
   test "node parsing":
-    var x = 0
     for c in parseNodeData:
       let input = toRange(c[0])
       let node = c[1]
       let kind = TrieNodeKind(node[0])
-      try:
-        let res = parseNode(input)
-        check(kind == res.kind)
-        case res.kind
-        of KV_TYPE:
-          check(res.keyPath == parseBitVector(node[1]))
-          check(res.child == toRange(node[2]))
-        of BRANCH_TYPE:
-          check(res.leftChild == toRange(node[2]))
-          check(res.rightChild == toRange(node[2]))
-        of LEAF_TYPE:
-          check(res.value == toRange(node[2]))
-      except InvalidNode as E:
-        discard
-      except:
-        echo getCurrentExceptionMsg()
-        check(false)
-      inc x
+      let raiseError = node[3]
+      var res: TrieNode
+
+      if raiseError:
+        expect(InvalidNode):
+          res = parseNode(input)
+      else:
+        res = parseNode(input)
+
+      check(kind == res.kind)
+      case res.kind
+      of KV_TYPE:
+        check(res.keyPath == parseBitVector(node[1]))
+        check(res.child == toRange(node[2]))
+      of BRANCH_TYPE:
+        check(res.leftChild == toRange(node[2]))
+        check(res.rightChild == toRange(node[2]))
+      of LEAF_TYPE:
+        check(res.value == toRange(node[2]))
 
   const
     kvData = [
-      ("0", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x00\x10\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
-      (""    , "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
-      ("0", "\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
-      ("1", "\x00\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
-      ("2", "", None)
+      ("0", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x00\x10\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", false),
+      (""    , "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None, true),
+      ("0", "\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None, true),
+      ("1", "\x00\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None, true),
+      ("2", "", None, true)
     ]
 
   test "kv node encoding":
@@ -88,22 +88,22 @@ suite "binaries utils":
       let keyPath = parseBitVector(c[0])
       let node    = toRange(c[1])
       let output  = toBytes(c[2])
+      let raiseError = c[3]
 
-      try:
+      if raiseError:
+        expect(ValidationError):
+          check output == encodeKVNode(keyPath, node)
+      else:
         check output == encodeKVNode(keyPath, node)
-      except ValidationError as E:
-        discard
-      except:
-        check(getCurrentExceptionMsg() == "len(childHash) == 32 ")
 
   const
     branchData = [
       ("\xc8\x9e\xfd\xaaT\xc0\xf2\x0cz\xdfa(\x82\xdf\tP\xf5\xa9Qc~\x03\x07\xcd\xcbLg/)\x8b\x8b\xc6", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p",
-        "\x01\xc8\x9e\xfd\xaaT\xc0\xf2\x0cz\xdfa(\x82\xdf\tP\xf5\xa9Qc~\x03\x07\xcd\xcbLg/)\x8b\x8b\xc6\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p"),
-      ("", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None),
-      ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x01", None),
-      ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "12345", None),
-      (repeat('\x01', 33), repeat('\x01', 32), None),
+        "\x01\xc8\x9e\xfd\xaaT\xc0\xf2\x0cz\xdfa(\x82\xdf\tP\xf5\xa9Qc~\x03\x07\xcd\xcbLg/)\x8b\x8b\xc6\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", false),
+      ("", "\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", None, true),
+      ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "\x01", None, true),
+      ("\xc5\xd2F\x01\x86\xf7#<\x92~}\xb2\xdc\xc7\x03\xc0\xe5\x00\xb6S\xca\x82';{\xfa\xd8\x04]\x85\xa4p", "12345", None, true),
+      (repeat('\x01', 33), repeat('\x01', 32), None, true),
     ]
 
   test "branch node encode":
@@ -111,28 +111,28 @@ suite "binaries utils":
       let left   = toRange(c[0])
       let right  = toRange(c[1])
       let output = toBytes(c[2])
+      let raiseError = c[3]
 
-      try:
+      if raiseError:
+        expect(ValidationError):
+          check output == encodeBranchNode(left, right)
+      else:
         check output == encodeBranchNode(left, right)
-      except AssertionError as E:
-        check (E.msg == "len(leftChildHash) == 32 ") or (E.msg == "len(rightChildHash) == 32 ")
-      except:
-        check(false)
 
   const
     leafData = [
-      ("\x03\x04\x05", "\x02\x03\x04\x05"),
-      ("", None)
+      ("\x03\x04\x05", "\x02\x03\x04\x05", false),
+      ("", None, true)
     ]
 
   test "leaf node encode":
     for c in leafData:
-      try:
+      let raiseError = c[2]
+      if raiseError:
+        expect(ValidationError):
+          check toBytes(c[1]) == encodeLeafNode(toRange(c[0]))
+      else:
         check toBytes(c[1]) == encodeLeafNode(toRange(c[0]))
-      except ValidationError as E:
-        discard
-      except:
-        check(false)
 
   test "random kv encoding":
     let lengths = randList(int, randGen(1, 999), randGen(100, 100), unique = false)
@@ -174,4 +174,3 @@ suite "binaries utils":
     check okp == kp
     check okp.len == 1
     check okp == bitvec
-

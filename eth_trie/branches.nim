@@ -1,5 +1,4 @@
 import
-  nimcrypto/[keccak, hash],
   rlp/types as rlpTypes, ranges/bitranges,
   binary, binaries, memdb, types, utils
 
@@ -95,8 +94,8 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHa
   var db = trieDB newMemDB()
   for node in branch:
     assert(node.len != 0)
-    let nodeHash = keccak256.digest(node.baseAddr, uint(node.len))
-    db.put(nodeHash.data, node.toOpenArray)
+    let nodeHash = keccakHash(node)
+    db.put(nodeHash.toOpenArray, node.toOpenArray)
 
   var trie = initBinaryTrie(db, rootHash)
   result = trie.get(key) == toRange(value)
