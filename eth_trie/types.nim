@@ -1,9 +1,9 @@
 import
-  nimcrypto/hash, rlp/types, eth_common
+  nimcrypto/hash, rlp/types, eth_common/eth_types
+
+export KeccakHash
 
 type
-  KeccakHash* = MDigest[256]
-
   TrieDatabaseConcept* = concept DB
     mixin put, del, get
 
