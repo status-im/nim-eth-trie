@@ -70,7 +70,7 @@ suite "examples":
     # ==> [A, B, C1, D1, C2, D2]
     check branch.len == 6
 
-  let beforeDeleteLen = memDB[].len
+  let beforeDeleteLen = memDB.len
   test "verify intermediate entries existence":
     var branchs = getWitness(db, trie.getRootHash, zeroBytesRange)
     # set operation create new intermediate entries
@@ -89,7 +89,7 @@ suite "examples":
 
   test "prove the lie":
     # `delete` and `deleteSubtrie` not actually delete the nodes
-    check memDB[].len == beforeDeleteLen
+    check memDB.len == beforeDeleteLen
     var branchs = getWitness(db, trie.getRootHash, zeroBytesRange)
     check branchs.len == 0
 
