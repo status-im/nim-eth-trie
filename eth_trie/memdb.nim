@@ -4,7 +4,7 @@ import
 
 type
   MemDBTable = Table[Bytes, Bytes]
-  MemDB* = object of RootObj
+  MemDB* = ref object of RootObj
     tbl: MemDBTable
 
 proc keccak*(r: BytesRange): KeccakHash =
@@ -29,7 +29,7 @@ proc `==` *[T](x, y: openarray[T]): bool =
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
   db.tbl[@key]
 
-proc del*(db: var MemDB, key: openarray[byte]) =
+proc del*(db: MemDB, key: openarray[byte]) =
   # The database should ensure that the empty key is always active:
   if key != emptyRlpHash.data:
     db.tbl.del(@key)
@@ -40,19 +40,13 @@ proc contains*(db: MemDB, key: openarray[byte]): bool =
 template printPair(k, v) =
   echo k.toHex, " = ", rlpFromBytes(v.toRange).inspect
 
-proc put*(db: var MemDB, key, val: openarray[byte]) =
-  let
-    k = @key
-    v = @val
+proc put*(db: MemDB, key, val: openarray[byte]) =
+  db.tbl[@key] = @val
 
-  # printPair(k, v)
-
-  db.tbl[k] = v
-
-proc newMemDB*: ref MemDB =
-  result = new(ref MemDB)
+proc newMemDB*: MemDB =
+  result.new
   result.tbl = initTable[Bytes, Bytes]()
-  put(result[], emptyRlpHash.data, emptyRlp.toOpenArray)
+  put(result, emptyRlpHash.data, emptyRlp.toOpenArray)
 
 proc `$`*(db: MemDB): string =
   for k, v in db.tbl:

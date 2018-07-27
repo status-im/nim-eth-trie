@@ -28,26 +28,22 @@ type
     containsProc: ContainsProc
 
 proc putImpl[T](db: RootRef, key, val: openarray[byte]) =
-  type DBRef = ref T
   mixin put
-  put(DBRef(db)[], key, val)
+  put(T(db), key, val)
 
 proc getImpl[T](db: RootRef, key: openarray[byte]): Bytes =
-  type DBRef = ref T
   mixin get
-  return get(DBRef(db)[], key)
+  return get(T(db), key)
 
 proc delImpl[T](db: RootRef, key: openarray[byte]) =
-  type DBRef = ref T
   mixin del
-  del(DBRef(db)[], key)
+  del(T(db), key)
 
 proc containsImpl[T](db: RootRef, key: openarray[byte]): bool =
-  type DBRef = ref T
   mixin contains
-  return contains(DBRef(db)[], key)
+  return contains(T(db), key)
 
-proc trieDB*[T](x: ref T): TrieDatabaseRef =
+proc trieDB*[T: RootRef](x: T): TrieDatabaseRef =
   result.obj = x
   mixin del, get, put
   result.putProc = putImpl[T]
