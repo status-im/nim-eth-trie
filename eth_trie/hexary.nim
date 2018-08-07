@@ -131,7 +131,7 @@ proc get*(self: HexaryTrie; key: BytesRange): BytesRange =
   return getAuxByHash(self.db, self.root, initNibbleRange(key))
 
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
-  if data.len > 32: t.db.del(data.keccak.data)
+  if data.len >= 32: t.db.del(data.keccak.data)
 
 proc dbPut(db: DB, data: BytesRange): TrieNodeKey =
   result.hash = data.keccak
@@ -370,7 +370,9 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       self.mergeAtAux(r, origValue, key.slice(k.len), value)
       return r.finish()
 
-    self.db.del(origHash.data)
+    if orig.rawData.len >= 32:
+      self.db.del(origHash.data)
+
     if sharedNibbles > 0:
       # Split the extension node
       var bottom = initRlpList(2)

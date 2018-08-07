@@ -3,7 +3,11 @@ import
   eth_trie/types, nimcrypto/[hash, utils, keccak]
 
 type
-  MemDBTable = Table[Bytes, Bytes]
+  MemDbRecord = object
+    refCount: int
+    value: Bytes
+
+  MemDBTable = Table[Bytes, MemDbRecord]
   MemDB* = ref object of RootObj
     tbl: MemDBTable
 
@@ -27,30 +31,36 @@ proc `==` *[T](x, y: openarray[T]): bool =
   result = true
 
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
-  db.tbl[@key]
+  # echo "DB GET ", key.toHex
+  db.tbl[@key].value
 
 proc del*(db: MemDB, key: openarray[byte]) =
   # The database should ensure that the empty key is always active:
   if key != emptyRlpHash.data:
-    db.tbl.del(@key)
+    let key = @key
+    db.tbl.withValue(key, v):
+      dec v.refCount
+      if v.refCount <= 0:
+        db.tbl.del(key)
 
 proc contains*(db: MemDB, key: openarray[byte]): bool =
   db.tbl.hasKey(@key)
 
 template printPair(k, v) =
-  echo k.toHex, " = ", rlpFromBytes(v.toRange).inspect
+  echo "KEY ", k.toHex, " = ", v.toHex # rlpFromBytes(@v.toRange).inspect
 
 proc put*(db: MemDB, key, val: openarray[byte]) =
-  db.tbl[@key] = @val
+  # printPair(key, val)
+  let key = @key
+  db.tbl.withValue(key, v) do:
+    inc v.refCount
+  do:
+    db.tbl[key] = MemDbRecord(refCount: 1, value: @val)
 
 proc newMemDB*: MemDB =
   result.new
-  result.tbl = initTable[Bytes, Bytes]()
+  result.tbl = initTable[Bytes, MemDbRecord]()
   put(result, emptyRlpHash.data, emptyRlp.toOpenArray)
-
-proc `$`*(db: MemDB): string =
-  for k, v in db.tbl:
-    printPair(k, v)
 
 proc len*(db: MemDB): int =
   db.tbl.len
