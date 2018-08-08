@@ -55,6 +55,9 @@ proc initHexaryTrie*(db: DB, rootHash: KeccakHash): HexaryTrie =
   result.db = db
   result.root = rootHash
 
+template initSecureHexaryTrie*(db: DB, rootHash: KeccakHash): SecureHexaryTrie =
+  SecureHexaryTrie initHexaryTrie(db, rootHash)
+
 let
   # XXX: turning this into a constant leads to a compilation failure
   emptyRlp = rlp.encode ""

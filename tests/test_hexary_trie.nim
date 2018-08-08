@@ -1,6 +1,6 @@
 import
-  unittest, strutils, sequtils,
-  ranges/typedranges, eth_trie/[hexary, types, memdb],
+  unittest, strutils, sequtils, os,
+  ranges/typedranges, eth_trie/[hexary, types, memdb], nimcrypto/utils,
   test_utils
 
 template put(t: HexaryTrie|SecureHexaryTrie, key, val: string) =
@@ -55,4 +55,26 @@ suite "hexary trie":
     addKey(24)
     addKey(188)
     addKey(136)
+
+
+  const genesisAccounts = "tests/cases/mainnet-genesis-accounts.txt"
+  if fileExists(genesisAccounts):
+    # This test is optional because it takes a while to run and the
+    # verification is already being part of Nimbus (see genesis.nim).
+    #
+    # On the other hand, it's useful to be able to debug just the trie
+    # code if problems arise. You can download the genesis-accounts file
+    # using the the following command at the root at the repo:
+    #
+    # wget https://gist.github.com/zah/f3a7d325a71d35df3c2606af05d30910/raw/d8bf8fed3d2760f0054cebf4de254a0564a87322/mainnet-genesis-accounts.txt -P tests/cases
+    test "genesis hash":
+      for line in lines(genesisAccounts):
+        var parts = line.split(" ")
+        var
+          key = fromHex(parts[0])
+          val = fromHex(parts[1])
+
+        SecureHexaryTrie(tr).put(key.toRange, val.toRange)
+
+      check tr.rootHashHex == "D7F8974FB5AC78D9AC099B9AD5018BEDC2CE0A72DAD1827A1709DA30580F0544"
 
