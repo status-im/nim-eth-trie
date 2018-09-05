@@ -2,8 +2,11 @@
 Nim Implementation of the Ethereum Trie structure
 ---
 
-[![Build Status][badge-nimtrie-travisci]][nimtrie-travisci]
-[![Build status][badge-nimtrie-appveyor]][nimtrie-appveyor]
+[![Build Status (Travis)](https://img.shields.io/travis/status-im/nim-eth-trie/master.svg?label=Linux%20/%20macOS "Linux/macOS build status (Travis)")](https://travis-ci.org/status-im/nim-eth-trie)
+[![Windows build status (Appveyor)](https://img.shields.io/appveyor/ci/nimbus/nim-eth-trie/master.svg?label=Windows "Windows build status (Appveyor)")](https://ci.appveyor.com/project/nimbus/nim-eth-trie)
+[![License: Apache](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+![Stability: experimental](https://img.shields.io/badge/stability-experimental-orange.svg)
 
 ## Hexary Trie
 
@@ -232,8 +235,9 @@ we need to remove them if necessary. We already see that `wholeTrie = getWitness
 will return the whole trie, a list of accessible nodes.
 Then we can write the clean tree into a new DB instance to replace the old one.
 
+## License
 
-[nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie
-[nimtrie-appveyor]: https://ci.appveyor.com/project/jarradh/nim-trie
-[badge-nimtrie-travisci]: https://travis-ci.org/status-im/nim-eth-trie.svg?branch=master
-[badge-nimtrie-appveyor]: https://ci.appveyor.com/api/projects/status/github/jarradh/nim-trie?svg=true
+Licensed under both of the following:
+
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license: [LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT
