@@ -16,7 +16,7 @@ type
 
 type
   PutProc = proc (db: RootRef, key, val: openarray[byte])
-  GetProc = proc (db: RootRef, key: openarray[byte]): Bytes
+  GetProc = proc (db: RootRef, key: openarray[byte]): Bytes # Must return empty seq if not found
   DelProc = proc (db: RootRef, key: openarray[byte])
   ContainsProc = proc (db: RootRef, key: openarray[byte]): bool
 
