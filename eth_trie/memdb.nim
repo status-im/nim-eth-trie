@@ -32,7 +32,7 @@ proc `==` *[T](x, y: openarray[T]): bool =
 
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
   # echo "DB GET ", key.toHex
-  db.tbl[@key].value
+  db.tbl.getOrDefault(@key).value
 
 proc del*(db: MemDB, key: openarray[byte]) =
   # The database should ensure that the empty key is always active:
