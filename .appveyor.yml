@@ -81,7 +81,7 @@ build_script:
   - cd C:\projects\%APPVEYOR_PROJECT_SLUG%
   - nimble install -y
 test_script:
-  - nimble testDebug
+  - nimble test
   - nimble testRelease
 
 deploy: off

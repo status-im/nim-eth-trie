@@ -13,17 +13,13 @@ requires "nim >= 0.18.1",
          "nimcrypto",
          "ranges"
 
-proc configForTests() =
+task test, "test debug mode":
   --hints: off
   --debuginfo
   --path: "."
   --run
-
-task testDebug, "test debug mode":
-  configForTests()
   setCommand "c", "tests/all.nim"
 
 task testRelease, "test release mode":
-  configForTests()
   switch("define", "release")
-  setCommand "c", "tests/all.nim"
+  testTask()
