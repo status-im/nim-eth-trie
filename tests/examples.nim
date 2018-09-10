@@ -1,5 +1,5 @@
 import
-  eth_trie/[memdb, binary, utils, branches, constants, types],
+  eth_trie/[memdb, binary, binaries, utils, branches, constants, types],
   nimcrypto/[keccak, hash], unittest
 
 suite "examples":
@@ -32,23 +32,15 @@ suite "examples":
     check isValidBranch(branchA, trie.getRootHash(), "key1", "value1") == true
     check isValidBranch(branchA, trie.getRootHash(), "key5", "") == true
 
-    try:
-      check isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # Key Error
-    except KeyError:
-      check(true)
-    except:
-      check(false)
+    expect InvalidNode:
+      check isValidBranch(branchB, trie.getRootHash(), "key1", "value1")
 
     var x = getBranch(db, trie.getRootHash(), "key")
     # ==> [A]
     check x.len == 1
 
-    try:
+    expect InvalidKeyError::
       x = getBranch(db, trie.getRootHash(), "key123") # InvalidKeyError
-    except InvalidKeyError:
-      check(true)
-    except:
-      check(false)
 
     x = getBranch(db, trie.getRootHash(), "key5") # there is still branch for non-exist key
     # ==> [A]
