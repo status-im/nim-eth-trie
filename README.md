@@ -200,7 +200,7 @@ assert isValidBranch(branchA, trie.getRootHash(), "key1", "value1") == true
 # wrong key, return zero bytes
 assert isValidBranch(branchA, trie.getRootHash(), "key5", "") == true
 
-assert isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # Key Error
+assert isValidBranch(branchB, trie.getRootHash(), "key1", "value1") # InvalidNode
 
 var x = getBranch(db, trie.getRootHash(), "key")
 # ==> [A]
