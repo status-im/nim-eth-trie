@@ -39,7 +39,7 @@ suite "examples":
     # ==> [A]
     check x.len == 1
 
-    expect InvalidKeyError::
+    expect InvalidKeyError:
       x = getBranch(db, trie.getRootHash(), "key123") # InvalidKeyError
 
     x = getBranch(db, trie.getRootHash(), "key5") # there is still branch for non-exist key
