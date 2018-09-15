@@ -1,6 +1,7 @@
 import
   tables, hashes, rlp,
-  eth_trie/types, nimcrypto/[hash, utils, keccak]
+  eth_trie/types, nimcrypto/[hash, keccak],
+  db_tracing
 
 type
   MemDbRecord = object
@@ -31,10 +32,12 @@ proc `==` *[T](x, y: openarray[T]): bool =
   result = true
 
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
-  # echo "DB GET ", key.toHex
-  db.tbl.getOrDefault(@key).value
+  result = db.tbl.getOrDefault(@key).value
+  traceGet key, result
 
 proc del*(db: MemDB, key: openarray[byte]) =
+  traceDel key
+
   # The database should ensure that the empty key is always active:
   if key != emptyRlpHash.data:
     let key = @key
@@ -46,11 +49,9 @@ proc del*(db: MemDB, key: openarray[byte]) =
 proc contains*(db: MemDB, key: openarray[byte]): bool =
   db.tbl.hasKey(@key)
 
-template printPair(k, v) =
-  echo "KEY ", k.toHex, " = ", v.toHex # rlpFromBytes(@v.toRange).inspect
-
 proc put*(db: MemDB, key, val: openarray[byte]) =
-  # printPair(key, val)
+  tracePut key, val
+
   let key = @key
   db.tbl.withValue(key, v) do:
     inc v.refCount
