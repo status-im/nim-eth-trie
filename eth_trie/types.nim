@@ -124,6 +124,7 @@ proc init(db: var MemDB) =
   db = newMemDB()
 
 proc newMemoryDB*: TrieDatabaseRef =
+  new result
   discard result.beginTransaction
   put(result, emptyRlpHash.data, emptyRlp.toOpenArray)
 
@@ -201,7 +202,8 @@ proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes =
       return
     t = t.parentTransaction
 
-  result = db.getProc(db.obj, key)
+  if db.getProc != nil:
+    result = db.getProc(db.obj, key)
 
 proc del*(db: TrieDatabaseRef, key: openarray[byte]) =
   var t = db.mostInnerTransaction
@@ -222,5 +224,6 @@ proc contains*(db: TrieDatabaseRef, key: openarray[byte]): bool =
       return
     t = t.parentTransaction
 
-  result = db.containsProc(db.obj, key)
+  if db.containsProc != nil:
+    result = db.containsProc(db.obj, key)
 

@@ -105,7 +105,7 @@ and then you want to continue/resume the trie operations.
 import
   eth_trie/[memdb, binary, utils]
 
-var db = newMemDB()
+var db = newMemoryDB()
 var trie = initBinaryTrie(db)
 trie.set("key1", "value1")
 trie.set("key2", "value2")
@@ -161,7 +161,7 @@ Therefore a list is enough to reconstruct the entire trie/branch.
 import
   eth_trie/[memdb, binary, utils]
 
-var db = newMemDB()
+var db = newMemoryDB()
 var trie = initBinaryTrie(db)
 trie.set("key1", "value1")
 trie.set("key2", "value2")

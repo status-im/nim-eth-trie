@@ -15,7 +15,7 @@ template get(t: HexaryTrie|SecureHexaryTrie, key): auto =
 suite "hexary trie":
   setup:
     var
-      db = trieDB newMemDB()
+      db = newMemoryDB()
       tr = initHexaryTrie(db)
 
   test "ref-counted keys crash":

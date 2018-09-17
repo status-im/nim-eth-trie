@@ -20,7 +20,7 @@ proc runSingleTest(testSequence: openarray[TestOp],
                    secureMode: bool,
                    expectedRootHash: string): bool =
   var
-    db = trieDB newMemDB()
+    db = newMemoryDB()
     t = initHexaryTrie(db)
 
   for op in testSequence:
