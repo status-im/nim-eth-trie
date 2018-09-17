@@ -13,8 +13,6 @@ type
     db: DB
     rootHash: BytesRange
 
-  KeyError* = object of Exception
-
 const
   treeHeight = 160
   emptyLeafNodeHash = blankStringHash
@@ -69,11 +67,10 @@ proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
   var nodeHash = self.rootHash
   for targetBit in path:
     let value = self.db.get(nodeHash.toOpenArray).toRange
-    if targetBit: nodeHash = value[0..31]
-    else: nodeHash = value[32..^1]
+    if targetBit: nodeHash = value[32..^1]
+    else: nodeHash = value[0..31]
 
   if nodeHash == emptyLeafNodeHash:
-    echo "FAILED"
     result = zeroBytesRange
   else:
     result = self.db.get(nodeHash.toOpenArray).toRange
@@ -94,10 +91,9 @@ proc setAux(self: var SparseMerkleTrie, value: BytesRange,
   else:
     let node = self.db.get(nodeHash.toOpenArray).toRange
     if path[depth]:
-      result = self.hashAndSave(node[32..^1], self.setAux(value, path, depth+1, node[0..31]))
+      result = self.hashAndSave(node[0..32], self.setAux(value, path, depth+1, node[32..^1]))
     else:
-      result = self.hashAndSave(self.setAux(value, path, depth+1, node[32..^1]), node[0..31])
-  echo result
+      result = self.hashAndSave(self.setAux(value, path, depth+1, node[0..31]), node[32..^1])
 
 proc set*(self: var SparseMerkleTrie, key, value: distinct BytesContainer) =
   assert(key.len == 20)
@@ -121,4 +117,3 @@ template `[]=`*(self: var SparseMerkleTrie, key, value: distinct BytesContainer)
 
 template contains*(self: SparseMerkleTrie, key: BytesContainer): bool =
   self.exists(key)
-
