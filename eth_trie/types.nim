@@ -1,7 +1,21 @@
 import
-  nimcrypto/hash, rlp/types, eth_common/eth_types
+  tables, hashes, sets,
+  nimcrypto/[hash, keccak], rlp, eth_common/eth_types,
+  db_tracing
 
 export KeccakHash
+
+type
+  MemDBRec = object
+    refCount: int
+    value: Bytes
+
+  ## TODO: the public ref type here can be removed once all the old code in
+  ## Nimbus has been updated to use the new in-memory databases provided by
+  ## `newMemoryDB`
+  MemDB* = ref object of RootObj
+    records: Table[Bytes, MemDBRec]
+    deleted: HashSet[Bytes]
 
 type
   TrieDatabaseConcept* = concept DB
@@ -20,12 +34,127 @@ type
   DelProc = proc (db: RootRef, key: openarray[byte])
   ContainsProc = proc (db: RootRef, key: openarray[byte]): bool
 
-  TrieDatabaseRef* = object
+  TrieDatabaseRef* = ref object
     obj: RootRef
     putProc: PutProc
     getProc: GetProc
     delProc: DelProc
     containsProc: ContainsProc
+    mostInnerTransaction: Transaction
+
+  Transaction* = ref object
+    db: TrieDatabaseRef
+    parentTransaction: Transaction
+    modifications: MemDB
+    committed: bool
+
+proc put*(db: TrieDatabaseRef, key, val: openarray[byte])
+proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes
+proc del*(db: TrieDatabaseRef, key: openarray[byte])
+proc beginTransaction*(db: TrieDatabaseRef): Transaction
+
+# TODO: This should be commited upstream
+proc `==` *[T](x, y: openarray[T]): bool =
+  if x.len != y.len:
+    return false
+
+  for f in low(x)..high(x):
+    if x[f] != y[f]:
+      return false
+
+  result = true
+
+proc keccak*(r: BytesRange): KeccakHash =
+  keccak256.digest r.toOpenArray
+
+let
+  # XXX: turning this into a constant leads to a compilation failure
+  emptyRlp = rlp.encode ""
+  emptyRlpHash = emptyRlp.keccak
+
+proc get*(db: MemDB, key: openarray[byte]): Bytes =
+  result = db.records.getOrDefault(@key).value
+  traceGet key, result
+
+proc del*(db: MemDB, key: openarray[byte]) =
+  traceDel key
+
+  # The database should ensure that the empty key is always active:
+  if key != emptyRlpHash.data:
+    # TODO: This is quite inefficient and it won't be necessary once
+    # https://github.com/nim-lang/Nim/issues/7457 is developed.
+    let key = @key
+
+    db.records.withValue(key, v):
+      dec v.refCount
+      if v.refCount <= 0:
+        db.records.del(key)
+        db.deleted.incl(key)
+
+proc contains*(db: MemDB, key: openarray[byte]): bool =
+  db.records.hasKey(@key)
+
+proc put*(db: MemDB, key, val: openarray[byte]) =
+  tracePut key, val
+
+  # TODO: This is quite inefficient and it won't be necessary once
+  # https://github.com/nim-lang/Nim/issues/7457 is developed.
+  let key = @key
+
+  db.deleted.excl(key)
+
+  db.records.withValue(key, v) do:
+    inc v.refCount
+  do:
+    db.records[key] = MemDBRec(refCount: 1, value: @val)
+
+proc newMemDB*: MemDB =
+  result.new
+  result.records = initTable[Bytes, MemDBRec]()
+  result.deleted = initSet[Bytes]()
+
+proc commit(memDb: MemDB, db: TrieDatabaseRef) =
+  for k in memDb.deleted:
+    db.del(k)
+
+  for k, v in memDb.records:
+    db.put(k, v.value)
+
+proc init(db: var MemDB) =
+  db = newMemDB()
+
+proc newMemoryDB*: TrieDatabaseRef =
+  discard result.beginTransaction
+  put(result, emptyRlpHash.data, emptyRlp.toOpenArray)
+
+proc len*(db: MemDB): int =
+  db.records.len
+
+proc beginTransaction*(db: TrieDatabaseRef): Transaction =
+  new result
+  init result.modifications
+
+  result.parentTransaction = db.mostInnerTransaction
+  db.mostInnerTransaction = result
+
+proc rollback*(t: Transaction) =
+  # Transactions should be handled in a strictly nested fashion.
+  # Any child transaction must be commited or rolled-back before
+  # its parent transactions:
+  doAssert t.db.mostInnerTransaction == t
+  t.db.mostInnerTransaction = t.parentTransaction
+
+proc commit*(t: Transaction) =
+  # Transactions should be handled in a strictly nested fashion.
+  # Any child transaction must be commited or rolled-back before
+  # its parent transactions:
+  doAssert t.db.mostInnerTransaction == t
+  t.modifications.commit(t.db)
+  t.committed = true
+
+proc dispose*(t: Transaction) =
+  if not t.committed:
+    t.rollback()
 
 proc putImpl[T](db: RootRef, key, val: openarray[byte]) =
   mixin put
@@ -44,22 +173,54 @@ proc containsImpl[T](db: RootRef, key: openarray[byte]): bool =
   return contains(T(db), key)
 
 proc trieDB*[T: RootRef](x: T): TrieDatabaseRef =
-  result.obj = x
   mixin del, get, put
+
+  new result
+  result.obj = x
   result.putProc = putImpl[T]
   result.getProc = getImpl[T]
   result.delProc = delImpl[T]
   result.containsProc = containsImpl[T]
 
 proc put*(db: TrieDatabaseRef, key, val: openarray[byte]) =
-  (db.putProc)(db.obj, key, val)
+  var t = db.mostInnerTransaction
+  if t != nil:
+    t.modifications.put(key, val)
+  else:
+    db.putProc(db.obj, key, val)
 
 proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes =
-  return (db.getProc)(db.obj, key)
+  # TODO: This is quite inefficient and it won't be necessary once
+  # https://github.com/nim-lang/Nim/issues/7457 is developed.
+  let key = @key
+
+  var t = db.mostInnerTransaction
+  while t != nil:
+    result = t.modifications.records.getOrDefault(key).value
+    if result.len > 0 or key in t.modifications.deleted:
+      return
+    t = t.parentTransaction
+
+  result = db.getProc(db.obj, key)
 
 proc del*(db: TrieDatabaseRef, key: openarray[byte]) =
-  (db.delProc)(db.obj, key)
+  var t = db.mostInnerTransaction
+  if t != nil:
+    t.modifications.del(key)
+  else:
+    db.delProc(db.obj, key)
 
 proc contains*(db: TrieDatabaseRef, key: openarray[byte]): bool =
-  return db.containsProc(db.obj, key)
+  # TODO: This is quite inefficient and it won't be necessary once
+  # https://github.com/nim-lang/Nim/issues/7457 is developed.
+  let key = @key
+
+  var t = db.mostInnerTransaction
+  while t != nil:
+    result = key in t.modifications.records
+    if result or key in t.modifications.deleted:
+      return
+    t = t.parentTransaction
+
+  result = db.containsProc(db.obj, key)
 
