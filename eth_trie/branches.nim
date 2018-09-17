@@ -91,7 +91,7 @@ proc isValidBranch*(branch: seq[BytesRange], rootHash: BytesContainer | KeccakHa
   # branch must not be empty
   assert(branch.len != 0)
 
-  var db = trieDB newMemDB()
+  var db = newMemoryDB()
   for node in branch:
     assert(node.len != 0)
     let nodeHash = keccakHash(node)
