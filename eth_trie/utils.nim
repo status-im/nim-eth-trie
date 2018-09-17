@@ -48,3 +48,14 @@ proc keccakHash*(input: BytesRange | Bytes): BytesRange =
   ctx.finish s
   ctx.clear()
   result = toRange(s)
+
+proc keccakHash*(input: varargs[KeccakHash]): KeccakHash =
+  var ctx: keccak256
+  ctx.init()
+  for c in input:
+    ctx.update(c.data[0].unsafeAddr, uint(c.data.len))
+  result = ctx.finish()
+  ctx.clear()
+
+template keccakHash*[T](input: openArray[T]): KeccakHash =
+  keccak256.digest(input)

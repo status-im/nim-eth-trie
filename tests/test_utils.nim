@@ -47,9 +47,9 @@ proc randList*(T: typedesc, strGen, listGen: RandGen, unique: bool = true): seq[
       let x = randPrimitives[T](strGen.getVal())
       result.add x
 
-proc randKVPair*(): seq[KVPair] =
+proc randKVPair*(keySize = 32): seq[KVPair] =
   const listLen = 100
-  let keys = randList(string, randGen(32, 32), randGen(listLen, listLen))
+  let keys = randList(string, randGen(keySize, keySize), randGen(listLen, listLen))
   let vals = randList(string, randGen(1, 100), randGen(listLen, listLen))
 
   result = newSeq[KVPair](listLen)

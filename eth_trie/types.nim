@@ -4,6 +4,8 @@ import
 export KeccakHash
 
 type
+  BytesContainer* = BytesRange | Bytes | string
+  
   TrieDatabaseConcept* = concept DB
     mixin put, del, get
 

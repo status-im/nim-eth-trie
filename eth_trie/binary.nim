@@ -15,8 +15,6 @@ type
 
   NodeOverrideError* = object of Exception
 
-  BytesContainer* = BytesRange | Bytes | string
-
 let
   zeroHash* = zeroBytesRange
 
