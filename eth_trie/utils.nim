@@ -9,10 +9,6 @@ proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
   result = newRange[byte](32)
   copyMem(result.baseAddr, hash.data.baseAddr, 32)
 
-proc toHash*(nodeHash: TrieNodeKey): KeccakHash =
-  assert(nodeHash.len == 32)
-  copyMem(result.data.baseAddr, nodeHash.baseAddr, 32)
-
 template checkValidHashZ*(x: untyped) =
   when x.type isnot KeccakHash:
     assert(x.len == 32 or x.len == 0)
@@ -52,7 +48,3 @@ proc keccakHash*(input: BytesRange | Bytes): BytesRange =
   ctx.finish s
   ctx.clear()
   result = toRange(s)
-
-template toKeccakPtr*(x: BytesRange): ptr KeccakHash =
-  assert(x.len == 32)
-  cast[ptr KeccakHash](x.baseAddr)
