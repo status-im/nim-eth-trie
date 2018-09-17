@@ -153,8 +153,12 @@ proc commit*(t: Transaction) =
   t.modifications.commit(t.db)
   t.committed = true
 
-proc dispose*(t: Transaction) =
+proc dispose*(t: Transaction) {.inline.} =
   if not t.committed:
+    t.rollback()
+
+proc safeDispose*(t: Transaction) {.inline.} =
+  if t != nil and not t.committed:
     t.rollback()
 
 proc putImpl[T](db: RootRef, key, val: openarray[byte]) =
