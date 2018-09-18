@@ -133,6 +133,7 @@ proc len*(db: MemDB): int =
 
 proc beginTransaction*(db: TrieDatabaseRef): DbTransaction =
   new result
+  result.db = db
   init result.modifications
 
   result.parentTransaction = db.mostInnerTransaction
