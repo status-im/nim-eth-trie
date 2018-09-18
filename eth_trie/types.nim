@@ -40,18 +40,18 @@ type
     getProc: GetProc
     delProc: DelProc
     containsProc: ContainsProc
-    mostInnerTransaction: Transaction
+    mostInnerTransaction: DbTransaction
 
-  Transaction* = ref object
+  DbTransaction* = ref object
     db: TrieDatabaseRef
-    parentTransaction: Transaction
+    parentTransaction: DbTransaction
     modifications: MemDB
     committed: bool
 
 proc put*(db: TrieDatabaseRef, key, val: openarray[byte])
 proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes
 proc del*(db: TrieDatabaseRef, key: openarray[byte])
-proc beginTransaction*(db: TrieDatabaseRef): Transaction
+proc beginTransaction*(db: TrieDatabaseRef): DbTransaction
 
 # TODO: This should be commited upstream
 proc `==` *[T](x, y: openarray[T]): bool =
@@ -131,21 +131,21 @@ proc newMemoryDB*: TrieDatabaseRef =
 proc len*(db: MemDB): int =
   db.records.len
 
-proc beginTransaction*(db: TrieDatabaseRef): Transaction =
+proc beginTransaction*(db: TrieDatabaseRef): DbTransaction =
   new result
   init result.modifications
 
   result.parentTransaction = db.mostInnerTransaction
   db.mostInnerTransaction = result
 
-proc rollback*(t: Transaction) =
+proc rollback*(t: DbTransaction) =
   # Transactions should be handled in a strictly nested fashion.
   # Any child transaction must be commited or rolled-back before
   # its parent transactions:
   doAssert t.db.mostInnerTransaction == t
   t.db.mostInnerTransaction = t.parentTransaction
 
-proc commit*(t: Transaction) =
+proc commit*(t: DbTransaction) =
   # Transactions should be handled in a strictly nested fashion.
   # Any child transaction must be commited or rolled-back before
   # its parent transactions:
@@ -153,11 +153,11 @@ proc commit*(t: Transaction) =
   t.modifications.commit(t.db)
   t.committed = true
 
-proc dispose*(t: Transaction) {.inline.} =
+proc dispose*(t: DbTransaction) {.inline.} =
   if not t.committed:
     t.rollback()
 
-proc safeDispose*(t: Transaction) {.inline.} =
+proc safeDispose*(t: DbTransaction) {.inline.} =
   if t != nil and not t.committed:
     t.rollback()
 
