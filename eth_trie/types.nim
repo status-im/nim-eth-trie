@@ -153,6 +153,7 @@ proc commit*(t: DbTransaction) =
   doAssert t.db.mostInnerTransaction == t
   t.modifications.commit(t.db)
   t.committed = true
+  t.db.mostInnerTransaction = t.parentTransaction
 
 proc dispose*(t: DbTransaction) {.inline.} =
   if not t.committed:
