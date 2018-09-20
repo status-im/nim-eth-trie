@@ -9,7 +9,7 @@ suite "binary trie":
     var kv_pairs = randKVPair()
     var result = zeroHash
     for _ in 0..<1: # repeat 3 times
-      var db = trieDB newMemDB()
+      var db = newMemoryDB()
       var trie = initBinaryTrie(db)
       random.shuffle(kv_pairs)
 
@@ -41,7 +41,7 @@ suite "binary trie":
 
   test "delete subtrie":
     for data in delSubtrieData:
-      var db = trieDB newMemDB()
+      var db = newMemoryDB()
       var trie = initBinaryTrie(db)
 
       let kv1 = data[0]
@@ -86,7 +86,7 @@ suite "binary trie":
 
   test "invalid key":
    for data in invalidKeyData:
-      var db = trieDB newMemDB()
+      var db = newMemoryDB()
       var trie = initBinaryTrie(db)
 
       trie.set("\x12\x34\x56\x78", "78")
@@ -112,7 +112,7 @@ suite "binary trie":
   test "update value":
     let keys = randList(string, randGen(32, 32), randGen(100, 100))
     let vals = randList(int, randGen(0, 99), randGen(50, 50))
-    var db = trieDB newMemDB()
+    var db = newMemoryDB()
     var trie = initBinaryTrie(db)
     for key in keys:
       trie.set(key, "old")
