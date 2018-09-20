@@ -15,6 +15,7 @@ type
 
 const
   treeHeight = 160
+  pathLen = treeHeight div 8
   emptyLeafNodeHash = blankStringHash
 
 proc makeInitialEmptyTreeHash(H: static[int]): array[H, KeccakHash] =
@@ -63,12 +64,11 @@ proc getDB*(t: SparseMerkleTrie): auto = t.db
 proc getRootHash*(self: SparseMerkleTrie): BytesRange {.inline.} =
   self.rootHash
 
-proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
-  assert(key.len == 20)
-  let path = MutByteRange(key.toRange).bits
-  var nodeHash = self.rootHash
+proc getAux(self: SparseMerkleTrie, path: BitRange, rootHash: BytesRange): BytesRange =
+  var nodeHash = rootHash
   for targetBit in path:
     let value = self.db.get(nodeHash.toOpenArray).toRange
+    if value.len == 0: return zeroBytesRange
     if targetBit: nodeHash = value[32..^1]
     else: nodeHash = value[0..31]
 
@@ -76,6 +76,18 @@ proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
     result = zeroBytesRange
   else:
     result = self.db.get(nodeHash.toOpenArray).toRange
+
+# Get gets a key from the tree.
+proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
+  assert(key.len == pathLen)
+  let path = MutByteRange(key.toRange).bits
+  self.getAux(path, self.rootHash)
+
+# GetForRoot gets a key from the tree at a specific root.
+proc get*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): BytesRange =
+  assert(key.len == pathLen)
+  let path = MutByteRange(key.toRange).bits
+  self.getAux(path, rootHash.toRange)
 
 proc hashAndSave*(self: SparseMerkleTrie, node: BytesRange): BytesRange =
   result = keccakHash(node)
@@ -100,17 +112,24 @@ proc setAux(self: var SparseMerkleTrie, value: BytesRange,
     else:
       result = self.hashAndSave(self.setAux(value, path, depth+1, leftNode), rightNode)
 
+# sets a new value for a key in the tree, returns the new root, and sets the new current root of the tree.
 proc set*(self: var SparseMerkleTrie, key, value: distinct BytesContainer) =
-  assert(key.len == 20)
+  assert(key.len == pathLen)
   let path = MutByteRange(key.toRange).bits
   self.rootHash = self.setAux(value.toRange, path, 0, self.rootHash)
+
+# setForRoot sets a new value for a key in the tree at a specific root, and returns the new root.
+proc set*(self: var SparseMerkleTrie, key, value, rootHash: distinct BytesContainer): BytesRange =
+  assert(key.len == pathLen)
+  let path = MutByteRange(key.toRange).bits
+  self.setAux(value.toRange, path, 0, rootHash.toRange)
 
 template exists*(self: SparseMerkleTrie, key: BytesContainer): bool =
   self.get(toRange(key)) != zeroBytesRange
 
 proc delete*(self: var SparseMerkleTrie, key: BytesContainer) =
   ## Equals to setting the value to zeroBytesRange
-  assert(key.len == 20)
+  assert(key.len == pathLen)
   self.set(key, zeroBytesRange)
 
 # Dictionary API
@@ -122,3 +141,41 @@ template `[]=`*(self: var SparseMerkleTrie, key, value: distinct BytesContainer)
 
 template contains*(self: SparseMerkleTrie, key: BytesContainer): bool =
   self.exists(key)
+
+proc proveAux(self: SparseMerkleTrie, key, rootHash: BytesRange, output: var seq[BytesRange]): bool =
+  assert(key.len == pathLen)
+  var currVal = self.db.get(rootHash.toOpenArray).toRange
+  if currVal.len == 0: return false
+
+  let path = MutByteRange(key).bits
+  for i, bit in path:
+    if bit:
+      # right side
+      output[i] = currVal[32..^1]
+      currVal = self.db.get(currVal[0..31].toOpenArray).toRange
+      if currVal.len == 0: return false
+    else:
+      output[i] = currVal[0..31]
+      currVal = self.db.get(currVal[32..^1].toOpenArray).toRange
+      if currVal.len == 0: return false
+
+# prove generates a Merkle proof for a key.
+proc prove*(self: SparseMerkleTrie, key: BytesContainer): seq[BytesRange] =
+  result = newSeq[BytesRange](treeHeight)
+  if not self.proveAux(key.toRange, self.rootHash, result):
+    result = @[]
+
+# prove generates a Merkle proof for a key, at a specific root.
+proc prove*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): seq[BytesRange] =
+  result = newSeq[BytesRange](treeHeight)
+  if not self.proveAux(key.toRange, rootHash.toRange, result):
+    result = @[]
+
+# proveCompact generates a compacted Merkle proof for a key.
+proc proveCompact*(self: SparseMerkleTrie, key: BytesContainer): seq[BytesRange] =
+  var temp = self.prove(key)
+
+# proveCompact generates a compacted Merkle proof for a key, at a specific root.
+proc proveCompact*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): seq[BytesRange] =
+  var temp = self.prove(key, rootHash)
+

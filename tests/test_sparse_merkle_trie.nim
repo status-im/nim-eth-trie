@@ -16,7 +16,7 @@ suite "sparse merkle trie":
 
   let prevRoot = trie.getRootHash()
   test "basic get":
-    for i, c in kv_pairs:
+    for c in kv_pairs:
       let x = trie.get(c.key)
       let y = toRange(c.value)
       check x == y
@@ -78,3 +78,23 @@ suite "sparse merkle trie":
     check x == y
     check kv_pairs[0].key in trie
 
+  test "get/set for specific root":
+    db = trieDB newMemDB()
+    trie = initSparseMerkleTrie(db)
+    let
+      testKey    = toRange(kv_pairs[0].key)
+      testValue  = toRange(kv_pairs[0].value)
+      testKey2   = toRange(kv_pairs[1].key)
+      testValue2 = toRange(kv_pairs[1].value)
+
+    trie.set(testKey, testValue)
+    var root = trie.getRootHash()
+    var value = trie.get(testKey, root)
+    check value == testValue
+
+    root = trie.set(testKey2, testValue2, root)
+    value = trie.get(testKey2, root)
+    check value == testValue2
+
+    value = trie.get(testKey, root)
+    check value == testValue
