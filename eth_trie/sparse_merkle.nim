@@ -34,6 +34,8 @@ type
   DoubleHash = array[64, byte]
 
 proc initDoubleHash(a, b: openArray[byte]): DoubleHash =
+  assert(a.len == 32, $a.len)
+  assert(b.len == 32, $b.len)
   copyMem(result[ 0].addr, a[0].unsafeAddr, 32)
   copyMem(result[32].addr, b[0].unsafeAddr, 32)
 
@@ -44,7 +46,7 @@ proc init*(x: typedesc[SparseMerkleTrie], db: DB): SparseMerkleTrie =
   result.db = db
   # Initialize an empty tree with one branch
   var value = initDoubleHash(emptyNodeHashes[0])
-  result.rootHash = keccakHash(value).toRange
+  result.rootHash = keccakHash(value)
   result.db.put(result.rootHash.toOpenArray, value)
 
   for i in 0..<treeHeight - 1:
@@ -81,7 +83,7 @@ proc hashAndSave*(self: SparseMerkleTrie, node: BytesRange): BytesRange =
 
 proc hashAndSave*(self: SparseMerkleTrie, a, b: BytesRange): BytesRange =
   let value = initDoubleHash(a.toOpenArray, b.toOpenArray)
-  result = keccakHash(value).toRange
+  result = keccakHash(value)
   self.db.put(result.toOpenArray, value)
 
 proc setAux(self: var SparseMerkleTrie, value: BytesRange,
@@ -89,11 +91,14 @@ proc setAux(self: var SparseMerkleTrie, value: BytesRange,
   if depth == treeHeight:
     result = self.hashAndSave(value)
   else:
-    let node = self.db.get(nodeHash.toOpenArray).toRange
+    let
+      node = self.db.get(nodeHash.toOpenArray).toRange
+      leftNode = node[0..31]
+      rightNode = node[32..^1]
     if path[depth]:
-      result = self.hashAndSave(node[0..32], self.setAux(value, path, depth+1, node[32..^1]))
+      result = self.hashAndSave(leftNode, self.setAux(value, path, depth+1, rightNode))
     else:
-      result = self.hashAndSave(self.setAux(value, path, depth+1, node[0..31]), node[32..^1])
+      result = self.hashAndSave(self.setAux(value, path, depth+1, leftNode), rightNode)
 
 proc set*(self: var SparseMerkleTrie, key, value: distinct BytesContainer) =
   assert(key.len == 20)

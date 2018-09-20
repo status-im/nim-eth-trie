@@ -3,7 +3,7 @@ import
   nimcrypto/[hash, keccak], parseutils, types, binaries,
   ranges/ptr_arith
 
-proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
+#proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
 
 proc toTrieNodeKey*(hash: KeccakHash): TrieNodeKey =
   result = newRange[byte](32)
@@ -40,11 +40,12 @@ proc hashFromHex*(bits: static[int], input: string): MDigest[bits] =
 
 template hashFromHex*(s: static[string]): untyped = hashFromHex(s.len * 4, s)
 
-proc keccakHash*(input: BytesRange | Bytes): BytesRange =
+proc keccakHash*(input: openArray[byte]): BytesRange =
   var s = newSeq[byte](32)
   var ctx: keccak256
   ctx.init()
-  ctx.update(input.baseAddr, uint(input.len))
+  if input.len > 0:
+    ctx.update(input[0].unsafeAddr, uint(input.len))
   ctx.finish s
   ctx.clear()
   result = toRange(s)
@@ -57,5 +58,5 @@ proc keccakHash*(input: varargs[KeccakHash]): KeccakHash =
   result = ctx.finish()
   ctx.clear()
 
-template keccakHash*[T](input: openArray[T]): KeccakHash =
-  keccak256.digest(input)
+template keccakHash*(input: BytesRange): BytesRange =
+  keccakHash(input.toOpenArray)
