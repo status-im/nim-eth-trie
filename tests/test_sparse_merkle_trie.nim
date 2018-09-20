@@ -1,5 +1,5 @@
 import
-  eth_trie/[memdb, sparse_merkle, constants, types],
+  eth_trie/[memdb, sparse_merkle, constants, types, sparse_proofs],
   unittest, test_utils, random
 
 suite "sparse merkle trie":
@@ -25,7 +25,7 @@ suite "sparse merkle trie":
     for c in kv_pairs:
       check trie.exists(c.key) == false
 
-    check trie.getRootHash() == keccakHash(emptyNodeHashes[0], emptyNodeHashes[0]).toRange
+    check trie.getRootHash() == keccakHash(emptyNodeHashes[0].toOpenArray, emptyNodeHashes[0].toOpenArray).toRange
 
   test "single update set":
     random.shuffle(kv_pairs)
@@ -98,3 +98,101 @@ suite "sparse merkle trie":
 
     value = trie.get(testKey, root)
     check value == testValue
+
+  proc makeBadProof(size: int, width = 32): seq[BytesRange] =
+    let badProofStr = randList(string, randGen(width, width), randGen(size, size))
+    result = newSeq[BytesRange](size)
+    for i in 0 ..< result.len:
+      result[i] = toRange(badProofStr[i])
+
+  test "proofs":
+    const
+      MaxBadProof = 32 * 8
+
+    let
+      testKey   = kv_pairs[0].key
+      badKey    = kv_pairs[1].key
+      testValue = "testValue"
+      testValue2 = "testValue2"
+      badValue  = "badValue"
+      badProof  = makeBadProof(MaxBadProof)
+
+    trie[testKey] = testValue
+    var proof = trie.prove(testKey)
+    check proof.len == treeHeight
+    check verifyProof(proof, trie.getRootHash(), testKey, testValue) == true
+    check verifyProof(proof, trie.getRootHash(), testKey, badValue) == false
+    check verifyProof(proof, trie.getRootHash(), badKey, testValue) == false
+    check verifyProof(badProof, trie.getRootHash(), testKey, testValue) == false
+
+    let
+      testKey2  = kv_pairs[2].key
+      testKey3  = kv_pairs[3].key
+      defaultValue = zeroBytesRange
+
+    trie.set(testKey2, testValue)
+    proof = trie.prove(testKey)
+    check verifyProof(proof, trie.getRootHash(), testKey, testValue) == true
+    check verifyProof(proof, trie.getRootHash(), testKey, badValue) == false
+    check verifyProof(proof, trie.getRootHash(), testKey2, testValue) == false
+    check verifyProof(badProof, trie.getRootHash(), testKey, testValue) == false
+
+    proof = trie.prove(testKey2)
+    check verifyProof(proof, trie.getRootHash(), testKey2, testValue) == true
+    check verifyProof(proof, trie.getRootHash(), testKey2, badValue) == false
+    check verifyProof(proof, trie.getRootHash(), testKey3, testValue) == false
+    check verifyProof(badProof, trie.getRootHash(), testKey, testValue) == false
+
+    var compactProof = compactProof(proof)
+    var decompactedProof = decompactProof(compactProof)
+
+    check decompactedProof.len == proof.len
+    for i, c in proof:
+      check decompactedProof[i] == c
+
+    let
+      badProof2 = makeBadProof(MaxBadProof + 1)
+      badProof3 = makeBadProof(MaxBadProof - 1)
+      badProof4 = makeBadProof(MaxBadProof, 31)
+      badProof5 = makeBadProof(MaxBadProof, 33)
+      badProof6 = makeBadProof(MaxBadProof, 1)
+
+    check verifyProof(badProof2, trie.getRootHash(), testKey3, defaultValue) == false
+    check verifyProof(badProof3, trie.getRootHash(), testKey3, defaultValue) == false
+    check verifyProof(badProof4, trie.getRootHash(), testKey3, defaultValue) == false
+    check verifyProof(badProof5, trie.getRootHash(), testKey3, defaultValue) == false
+    check verifyProof(badProof6, trie.getRootHash(), testKey3, defaultValue) == false
+
+    check compactProof(badProof2).len == 0
+    check compactProof(badProof3).len == 0
+    check decompactProof(badProof3).len == 0
+    var zeroProof: seq[BytesRange]
+    check decompactProof(zeroProof).len == 0
+
+    proof = trie.proveCompact(testKey2)
+    check verifyCompactProof(proof, trie.getRootHash(), testKey2, testValue) == true
+    check verifyCompactProof(proof, trie.getRootHash(), testKey2, badValue) == false
+    check verifyCompactProof(proof, trie.getRootHash(), testKey3, testValue) == false
+    check verifyCompactProof(badProof, trie.getRootHash(), testKey, testValue) == false
+
+    var root = trie.getRootHash()
+    trie.set(testKey2, testValue2)
+
+    proof = trie.proveCompact(testKey2, root)
+    check verifyCompactProof(proof, root, testKey2, testValue) == true
+    check verifyCompactProof(proof, root, testKey2, badValue) == false
+    check verifyCompactProof(proof, root, testKey3, testValue) == false
+    check verifyCompactProof(badProof, root, testKey, testValue) == false
+
+    proof = trie.prove(testKey2, root)
+    check verifyProof(proof, root, testKey2, testValue) == true
+    check verifyProof(proof, root, testKey2, badValue) == false
+    check verifyProof(proof, root, testKey3, testValue) == false
+    check verifyProof(badProof, root, testKey, testValue) == false
+
+    proof = trie.prove(testKey3)
+    check proof.len == 0
+    check verifyProof(proof, trie.getRootHash(), testKey3, defaultValue) == false
+    check verifyProof(proof, trie.getRootHash(), testKey3, badValue) == false
+    check verifyProof(proof, trie.getRootHash(), testKey2, defaultValue) == false
+    check verifyProof(badProof, trie.getRootHash(), testKey, testValue) == false

@@ -50,13 +50,26 @@ proc keccakHash*(input: openArray[byte]): BytesRange =
   ctx.clear()
   result = toRange(s)
 
-proc keccakHash*(input: varargs[KeccakHash]): KeccakHash =
+proc keccakHash*(dest: var openArray[byte], a, b: openArray[byte]) =
   var ctx: keccak256
   ctx.init()
-  for c in input:
-    ctx.update(c.data[0].unsafeAddr, uint(c.data.len))
-  result = ctx.finish()
+  if a.len != 0:
+    ctx.update(a[0].unsafeAddr, uint(a.len))
+  if b.len != 0:
+    ctx.update(b[0].unsafeAddr, uint(b.len))
+  ctx.finish dest
   ctx.clear()
+
+proc keccakHash*(a, b: openArray[byte]): BytesRange =
+  var s = newSeq[byte](32)
+  keccakHash(s, a, b)
+  result = toRange(s)
 
 template keccakHash*(input: BytesRange): BytesRange =
   keccakHash(input.toOpenArray)
+
+template keccakHash*(a, b: BytesRange): BytesRange =
+  keccakHash(a.toOpenArray, b.toOpenArray)
+
+template keccakHash*(dest: var BytesRange, a, b: BytesRange) =
+  keccakHash(dest.toOpenArray, a.toOpenArray, b.toOpenArray)

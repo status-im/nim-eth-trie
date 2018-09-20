@@ -1,10 +1,11 @@
 import
   ranges/[ptr_arith, typedranges, bitranges],
-  rlp/types as rlpTypes,
-  types, constants, utils
+  rlp/types as rlpTypes, types, constants, utils,
+  sparse_proofs
 
 export
-  types, rlpTypes, utils, bitranges
+  types, rlpTypes, utils, bitranges,
+  sparse_proofs.verifyProof
 
 type
   DB = TrieDatabaseRef
@@ -12,19 +13,6 @@ type
   SparseMerkleTrie* = object
     db: DB
     rootHash: BytesRange
-
-const
-  treeHeight = 160
-  pathLen = treeHeight div 8
-  emptyLeafNodeHash = blankStringHash
-
-proc makeInitialEmptyTreeHash(H: static[int]): array[H, KeccakHash] =
-  result[^1] = emptyLeafNodeHash
-  for i in countdown(H-1, 1):
-    result[i - 1] = keccakHash(result[i], result[i])
-
-# cannot yet turn this into compile time constant
-let emptyNodeHashes* = makeInitialEmptyTreeHash(treeHeight)
 
 proc `==`(a: BytesRange, b: KeccakHash): bool =
   if a.len != b.data.len: return false
@@ -40,8 +28,8 @@ proc initDoubleHash(a, b: openArray[byte]): DoubleHash =
   copyMem(result[ 0].addr, a[0].unsafeAddr, 32)
   copyMem(result[32].addr, b[0].unsafeAddr, 32)
 
-proc initDoubleHash(x: KeccakHash): DoubleHash =
-  initDoubleHash(x.data, x.data)
+proc initDoubleHash(x: BytesRange): DoubleHash =
+  initDoubleHash(x.toOpenArray, x.toOpenArray)
 
 proc init*(x: typedesc[SparseMerkleTrie], db: DB): SparseMerkleTrie =
   result.db = db
@@ -52,7 +40,7 @@ proc init*(x: typedesc[SparseMerkleTrie], db: DB): SparseMerkleTrie =
 
   for i in 0..<treeHeight - 1:
     value = initDoubleHash(emptyNodeHashes[i+1])
-    result.db.put(emptyNodeHashes[i].data, value)
+    result.db.put(emptyNodeHashes[i].toOpenArray, value)
 
   result.db.put(emptyLeafNodeHash.data, zeroBytesRange.toOpenArray)
 
@@ -77,15 +65,15 @@ proc getAux(self: SparseMerkleTrie, path: BitRange, rootHash: BytesRange): Bytes
   else:
     result = self.db.get(nodeHash.toOpenArray).toRange
 
-# Get gets a key from the tree.
 proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
-  assert(key.len == pathLen)
+  ## Get gets a key from the tree.
+  assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, self.rootHash)
 
-# GetForRoot gets a key from the tree at a specific root.
 proc get*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): BytesRange =
-  assert(key.len == pathLen)
+  ## GetForRoot gets a key from the tree at a specific root.
+  assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, rootHash.toRange)
 
@@ -112,15 +100,17 @@ proc setAux(self: var SparseMerkleTrie, value: BytesRange,
     else:
       result = self.hashAndSave(self.setAux(value, path, depth+1, leftNode), rightNode)
 
-# sets a new value for a key in the tree, returns the new root, and sets the new current root of the tree.
 proc set*(self: var SparseMerkleTrie, key, value: distinct BytesContainer) =
-  assert(key.len == pathLen)
+  ## sets a new value for a key in the tree, returns the new root,
+  ## and sets the new current root of the tree.
+  assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.rootHash = self.setAux(value.toRange, path, 0, self.rootHash)
 
-# setForRoot sets a new value for a key in the tree at a specific root, and returns the new root.
 proc set*(self: var SparseMerkleTrie, key, value, rootHash: distinct BytesContainer): BytesRange =
-  assert(key.len == pathLen)
+  ## setForRoot sets a new value for a key in the tree at a specific root,
+  ## and returns the new root.
+  assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.setAux(value.toRange, path, 0, rootHash.toRange)
 
@@ -129,7 +119,7 @@ template exists*(self: SparseMerkleTrie, key: BytesContainer): bool =
 
 proc delete*(self: var SparseMerkleTrie, key: BytesContainer) =
   ## Equals to setting the value to zeroBytesRange
-  assert(key.len == pathLen)
+  assert(key.len == pathByteLen)
   self.set(key, zeroBytesRange)
 
 # Dictionary API
@@ -143,7 +133,7 @@ template contains*(self: SparseMerkleTrie, key: BytesContainer): bool =
   self.exists(key)
 
 proc proveAux(self: SparseMerkleTrie, key, rootHash: BytesRange, output: var seq[BytesRange]): bool =
-  assert(key.len == pathLen)
+  assert(key.len == pathByteLen)
   var currVal = self.db.get(rootHash.toOpenArray).toRange
   if currVal.len == 0: return false
 
@@ -151,13 +141,15 @@ proc proveAux(self: SparseMerkleTrie, key, rootHash: BytesRange, output: var seq
   for i, bit in path:
     if bit:
       # right side
-      output[i] = currVal[32..^1]
-      currVal = self.db.get(currVal[0..31].toOpenArray).toRange
-      if currVal.len == 0: return false
-    else:
       output[i] = currVal[0..31]
       currVal = self.db.get(currVal[32..^1].toOpenArray).toRange
       if currVal.len == 0: return false
+    else:
+      output[i] = currVal[32..^1]
+      currVal = self.db.get(currVal[0..31].toOpenArray).toRange
+      if currVal.len == 0: return false
+
+  result = true
 
 # prove generates a Merkle proof for a key.
 proc prove*(self: SparseMerkleTrie, key: BytesContainer): seq[BytesRange] =
@@ -174,8 +166,9 @@ proc prove*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): seq
 # proveCompact generates a compacted Merkle proof for a key.
 proc proveCompact*(self: SparseMerkleTrie, key: BytesContainer): seq[BytesRange] =
   var temp = self.prove(key)
+  temp.compactProof
 
 # proveCompact generates a compacted Merkle proof for a key, at a specific root.
 proc proveCompact*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): seq[BytesRange] =
   var temp = self.prove(key, rootHash)
-
+  temp.compactProof
