@@ -47,6 +47,15 @@ proc init*(x: typedesc[SparseMerkleTrie], db: DB): SparseMerkleTrie =
 proc initSparseMerkleTrie*(db: DB): SparseMerkleTrie =
   init(SparseMerkleTrie, db)
 
+proc init*(x: typedesc[SparseMerkleTrie], db: DB,
+           rootHash: BytesContainer | KeccakHash): SparseMerkleTrie =
+  checkValidHashZ(rootHash)
+  result.db = db
+  result.rootHash = rootHash
+
+proc initSparseMerkleTrie*(db: DB, rootHash: BytesContainer | KeccakHash): SparseMerkleTrie =
+  init(SparseMerkleTrie, db, rootHash)
+
 proc getDB*(t: SparseMerkleTrie): auto = t.db
 
 proc getRootHash*(self: SparseMerkleTrie): BytesRange {.inline.} =
@@ -66,13 +75,13 @@ proc getAux(self: SparseMerkleTrie, path: BitRange, rootHash: BytesRange): Bytes
     result = self.db.get(nodeHash.toOpenArray).toRange
 
 proc get*(self: SparseMerkleTrie, key: BytesContainer): BytesRange =
-  ## Get gets a key from the tree.
+  ## gets a key from the tree.
   assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, self.rootHash)
 
 proc get*(self: SparseMerkleTrie, key, rootHash: distinct BytesContainer): BytesRange =
-  ## GetForRoot gets a key from the tree at a specific root.
+  ## gets a key from the tree at a specific root.
   assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, rootHash.toRange)
@@ -108,7 +117,7 @@ proc set*(self: var SparseMerkleTrie, key, value: distinct BytesContainer) =
   self.rootHash = self.setAux(value.toRange, path, 0, self.rootHash)
 
 proc set*(self: var SparseMerkleTrie, key, value, rootHash: distinct BytesContainer): BytesRange =
-  ## setForRoot sets a new value for a key in the tree at a specific root,
+  ## sets a new value for a key in the tree at a specific root,
   ## and returns the new root.
   assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits

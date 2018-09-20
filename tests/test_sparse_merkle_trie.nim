@@ -196,3 +196,30 @@ suite "sparse merkle trie":
     check verifyProof(proof, trie.getRootHash(), testKey3, badValue) == false
     check verifyProof(proof, trie.getRootHash(), testKey2, defaultValue) == false
     check verifyProof(badProof, trie.getRootHash(), testKey, testValue) == false
+
+  test "examples":
+    let
+      key1 = "01234567890123456789"
+      key2 = "abcdefghijklmnopqrst"
+
+    trie.set(key1, "value1")
+    trie.set(key2, "value2")
+    check trie.get(key1) == "value1".toRange
+    check trie.get(key2) == "value2".toRange
+
+    trie.delete(key1)
+    check trie.get(key1) == zeroBytesRange
+
+    trie.delete(key2)
+    check trie[key2] == zeroBytesRange
+
+    let
+      value1 = "hello world"
+      badValue = "bad value"
+
+    trie[key1] = value1
+    var proof = trie.prove(key1)
+
+    check verifyProof(proof, trie.getRootHash(), key1, value1) == true
+    check verifyProof(proof, trie.getRootHash(), key1, badValue) == false
+    check verifyProof(proof, trie.getRootHash(), key2, value1) == false

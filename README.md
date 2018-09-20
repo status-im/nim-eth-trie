@@ -88,11 +88,11 @@ Additional APIs are:
  * rootNode() -- get root node
  * rootNode(node) -- replace the root node
  * getRootHash(): `KeccakHash` with `BytesRange` type
- * getDB(): `ref DB` -- get flat-db pointer
+ * getDB(): `DB` -- get flat-db pointer
 
 Constructor API:
-  * initBinaryTrie(ref DB, rootHash[optional]) -- rootHash has `BytesRange` or KeccakHash type
-  * init(BinaryTrie[DB], ref DB, rootHash[optional])
+  * initBinaryTrie(DB, rootHash[optional]) -- rootHash has `BytesRange` or KeccakHash type
+  * init(BinaryTrie, DB, rootHash[optional])
 
 Normally you would not set the rootHash when constructing an empty Binary-trie.
 Setting the rootHash occured in a scenario where you have a populated DB
@@ -234,6 +234,113 @@ Because trie `delete`, `deleteSubtrie` and `set` operation create inaccessible n
 we need to remove them if necessary. We already see that `wholeTrie = getWitness(db, trie.getRootHash(), "")`
 will return the whole trie, a list of accessible nodes.
 Then we can write the clean tree into a new DB instance to replace the old one.
+
+
+## Sparse Merkle Trie
+
+Sparse Merkle Trie(SMT) is a variant of Binary Trie which uses binary encoding to
+represent path during trie travelsal. When Binary Trie uses three types of node,
+SMT only use one type of node without any additional special encoding to store it's key-path.
+
+Actually, it doesn't even store it's key-path anywhere like Binary Trie,
+the key-path is stored implicitly in the trie structure during key-value insertion.
+
+Because the key-path is not encoded in any special ways, the bits can be extracted directly from
+the key without any conversion.
+
+However, the key restricted to fixed length because the algorithm demand a fixed height
+for the trie to works properly. In this case, the trie height is limited to 160 level,
+or the key is of fixed length 20 bytes.
+
+To be able to use variable length key, the algorithm can be adapted slightly using hashed key before
+constructing the binary key-path. For example, if using keccak256 as the hashing function,
+then the height of the tree will be 256, but the key itself can be any length.
+
+### The API
+
+The primary API for Binary-trie is `set` and `get`.
+* set(key, value, rootHash[optional])  ---  _store a value associated with a key_
+* get(key, rootHash[optional]): value  --- _get a value using a key_
+
+Both `key` and `value` are of `BytesRange` type. And they cannot have zero length.
+You can also use convenience API `get` and `set` which accepts
+`Bytes` or `string` (a `string` is conceptually wrong in this context
+and may costlier than a `BytesRange`, but it is good for testing purpose).
+
+rootHash is an optional parameter. When used, `get` will get a key from specific root,
+and `set` will also set a key at specific root.
+
+Getting a non-existent key will return zero length BytesRange or a zeroBytesRange.
+
+Sparse Merkle Trie also provide dictionary syntax API for `set` and `get`.
+* trie[key] = value -- same as `set`
+* value = trie[key] -- same as `get`
+* contains(key) a.k.a. `in` operator
+
+Additional APIs are:
+ * exists(key) -- returns `bool`, to check key-value existence -- same as contains
+ * delete(key) -- remove a key-value from the trie
+ * getRootHash(): `KeccakHash` with `BytesRange` type
+ * getDB(): `DB` -- get flat-db pointer
+ * prove(key, rootHash[optional]): proof -- get a list of information to proof the in/existence of a certain data
+
+Constructor API:
+  * initSparseMerkleTrie(DB, rootHash[optional])
+  * init(SparseMerkleTrie, DB, rootHash[optional])
+
+Normally you would not set the rootHash when constructing an empty Sparse Merkle Trie.
+Setting the rootHash occured in a scenario where you have a populated DB
+with existing trie structure and you know the rootHash,
+and then you want to continue/resume the trie operations.
+
+## Examples
+
+```Nim
+import
+  eth_trie/[memdb, sparse_merkle, utils]
+
+var
+  db = newMemDB()
+  trie = initSparseMerkleTrie(db)
+
+let
+  key1 = "01234567890123456789"
+  key2 = "abcdefghijklmnopqrst"
+
+trie.set(key1, "value1")
+trie.set(key2, "value2")
+assert trie.get(key1) == "value1".toRange
+assert trie.get(key2) == "value2".toRange
+
+trie.delete(key1)
+assert trie.get(key1) == zeroBytesRange
+
+trie.delete(key2)
+assert trie[key2] == zeroBytesRange
+```
+
+Remember, `set` and `get` are trie operations. A single `set` operation may invoke
+more than one store/lookup operation into the underlying DB. The same is also happened to `get` operation,
+it could do more than one flat-db lookup before it return the requested value.
+While Binary Trie perform a variable numbers of lookup and store operations, Sparse Merkle Trie
+will do constant numbers of lookup and store operations each `get` and `set` operation.
+
+## Merkle Proofing
+
+Using ``prove`` dan ``verifyProof`` API, we can do some merkling with SMT.
+
+```Nim
+  let
+    value1 = "hello world"
+    badValue = "bad value"
+
+  trie[key1] = value1
+  var proof = trie.prove(key1)
+
+  assert verifyProof(proof, trie.getRootHash(), key1, value1) == true
+  assert verifyProof(proof, trie.getRootHash(), key1, badValue) == false
+  assert verifyProof(proof, trie.getRootHash(), key2, value1) == false
+```
 
 ## License
 
