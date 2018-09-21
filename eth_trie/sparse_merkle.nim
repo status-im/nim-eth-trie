@@ -126,7 +126,7 @@ proc set*(self: var SparseMerkleTrie, key, value, rootHash: distinct BytesContai
 template exists*(self: SparseMerkleTrie, key: BytesContainer): bool =
   self.get(toRange(key)) != zeroBytesRange
 
-proc delete*(self: var SparseMerkleTrie, key: BytesContainer) =
+proc del*(self: var SparseMerkleTrie, key: BytesContainer) =
   ## Equals to setting the value to zeroBytesRange
   assert(key.len == pathByteLen)
   self.set(key, zeroBytesRange)

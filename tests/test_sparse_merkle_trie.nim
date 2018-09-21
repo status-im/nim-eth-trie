@@ -6,7 +6,7 @@ suite "sparse merkle trie":
   randomize()
   var kv_pairs = randKVPair(20)
   var numbers = randList(int, randGen(1, 99), randGen(50, 100))
-  var db = trieDB newMemDB()
+  var db = newMemoryDB()
   var trie = initSparseMerkleTrie(db)
 
   test "basic set":
@@ -20,7 +20,7 @@ suite "sparse merkle trie":
       let x = trie.get(c.key)
       let y = toRange(c.value)
       check x == y
-      trie.delete(c.key)
+      trie.del(c.key)
 
     for c in kv_pairs:
       check trie.exists(c.key) == false
@@ -79,7 +79,7 @@ suite "sparse merkle trie":
     check kv_pairs[0].key in trie
 
   test "get/set for specific root":
-    db = trieDB newMemDB()
+    db = newMemoryDB()
     trie = initSparseMerkleTrie(db)
     let
       testKey    = toRange(kv_pairs[0].key)
@@ -207,10 +207,10 @@ suite "sparse merkle trie":
     check trie.get(key1) == "value1".toRange
     check trie.get(key2) == "value2".toRange
 
-    trie.delete(key1)
+    trie.del(key1)
     check trie.get(key1) == zeroBytesRange
 
-    trie.delete(key2)
+    trie.del(key2)
     check trie[key2] == zeroBytesRange
 
     let

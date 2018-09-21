@@ -300,7 +300,7 @@ import
   eth_trie/[memdb, sparse_merkle, utils]
 
 var
-  db = newMemDB()
+  db = newMemoryDB()
   trie = initSparseMerkleTrie(db)
 
 let
