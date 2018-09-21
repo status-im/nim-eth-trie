@@ -91,8 +91,8 @@ Additional APIs are:
  * getDB(): `DB` -- get flat-db pointer
 
 Constructor API:
-  * initBinaryTrie(DB, rootHash[optional]) -- rootHash has `BytesRange` or KeccakHash type
-  * init(BinaryTrie, DB, rootHash[optional])
+ * initBinaryTrie(DB, rootHash[optional]) -- rootHash has `BytesRange` or KeccakHash type
+ * init(BinaryTrie, DB, rootHash[optional])
 
 Normally you would not set the rootHash when constructing an empty Binary-trie.
 Setting the rootHash occured in a scenario where you have a populated DB
@@ -248,9 +248,9 @@ the key-path is stored implicitly in the trie structure during key-value inserti
 Because the key-path is not encoded in any special ways, the bits can be extracted directly from
 the key without any conversion.
 
-However, the key restricted to fixed length because the algorithm demand a fixed height
-for the trie to works properly. In this case, the trie height is limited to 160 level,
-or the key is of fixed length 20 bytes.
+However, the key restricted to a fixed length because the algorithm demand a fixed height trie
+to works properly. In this case, the trie height is limited to 160 level,
+or the key is of fixed length 20 bytes (8 bits x 20 = 160).
 
 To be able to use variable length key, the algorithm can be adapted slightly using hashed key before
 constructing the binary key-path. For example, if using keccak256 as the hashing function,
@@ -273,20 +273,20 @@ and `set` will also set a key at specific root.
 Getting a non-existent key will return zero length BytesRange or a zeroBytesRange.
 
 Sparse Merkle Trie also provide dictionary syntax API for `set` and `get`.
-* trie[key] = value -- same as `set`
-* value = trie[key] -- same as `get`
-* contains(key) a.k.a. `in` operator
+ * trie[key] = value -- same as `set`
+ * value = trie[key] -- same as `get`
+ * contains(key) a.k.a. `in` operator
 
 Additional APIs are:
  * exists(key) -- returns `bool`, to check key-value existence -- same as contains
  * delete(key) -- remove a key-value from the trie
  * getRootHash(): `KeccakHash` with `BytesRange` type
  * getDB(): `DB` -- get flat-db pointer
- * prove(key, rootHash[optional]): proof -- get a list of information to proof the in/existence of a certain data
+ * prove(key, rootHash[optional]): proof -- useful for merkling
 
 Constructor API:
-  * initSparseMerkleTrie(DB, rootHash[optional])
-  * init(SparseMerkleTrie, DB, rootHash[optional])
+ * initSparseMerkleTrie(DB, rootHash[optional])
+ * init(SparseMerkleTrie, DB, rootHash[optional])
 
 Normally you would not set the rootHash when constructing an empty Sparse Merkle Trie.
 Setting the rootHash occured in a scenario where you have a populated DB
