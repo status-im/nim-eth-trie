@@ -1,6 +1,6 @@
 import
-  eth_trie/[binary, hexary]
+  eth_trie/[hexary, sparse_binary]
 
 export
-  binary, hexary
+  hexary, sparse_binary
 

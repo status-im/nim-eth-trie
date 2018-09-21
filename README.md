@@ -285,8 +285,8 @@ Additional APIs are:
  * prove(key, rootHash[optional]): proof -- useful for merkling
 
 Constructor API:
- * initSparseMerkleTrie(DB, rootHash[optional])
- * init(SparseMerkleTrie, DB, rootHash[optional])
+ * initSparseBinaryTrie(DB, rootHash[optional])
+ * init(SparseBinaryTrie, DB, rootHash[optional])
 
 Normally you would not set the rootHash when constructing an empty Sparse Merkle Trie.
 Setting the rootHash occured in a scenario where you have a populated DB
@@ -297,7 +297,7 @@ and then you want to continue/resume the trie operations.
 
 ```Nim
 import
-  eth_trie/[memdb, sparse_merkle, utils]
+  eth_trie/[memdb, sparse_binary, utils]
 
 var
   db = newMemoryDB()

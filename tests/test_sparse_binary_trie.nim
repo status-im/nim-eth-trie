@@ -1,13 +1,13 @@
 import
-  eth_trie/[memdb, sparse_merkle, constants, types, sparse_proofs],
+  eth_trie/[memdb, sparse_binary, constants, types, sparse_proofs],
   unittest, test_utils, random
 
-suite "sparse merkle trie":
+suite "sparse binary trie":
   randomize()
   var kv_pairs = randKVPair(20)
   var numbers = randList(int, randGen(1, 99), randGen(50, 100))
   var db = newMemoryDB()
-  var trie = initSparseMerkleTrie(db)
+  var trie = initSparseBinaryTrie(db)
 
   test "basic set":
     for c in kv_pairs:
@@ -80,7 +80,7 @@ suite "sparse merkle trie":
 
   test "get/set for specific root":
     db = newMemoryDB()
-    trie = initSparseMerkleTrie(db)
+    trie = initSparseBinaryTrie(db)
     let
       testKey    = toRange(kv_pairs[0].key)
       testValue  = toRange(kv_pairs[0].value)
