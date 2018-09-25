@@ -64,7 +64,7 @@ let
 
 proc initHexaryTrie*(db: DB): HexaryTrie =
   result.db = db
-  result.root = result.db.dbPut(emptyRlp)
+  result.root = result.db.dbPut(emptyRlp.toRange)
 
 proc rootHash*(t: HexaryTrie): KeccakHash =
   t.root.hash
@@ -151,7 +151,7 @@ proc appendAndSave(rlpWriter: var RlpWriter, data: BytesRange, db: DB) =
 proc isTrieBranch(rlp: Rlp): bool =
   rlp.isList and (var len = rlp.listLen; len == 2 or len == 17)
 
-proc replaceValue(data: Rlp, key: NibblesRange, value: BytesRange): BytesRange =
+proc replaceValue(data: Rlp, key: NibblesRange, value: BytesRange): Bytes =
   if data.isEmpty:
     let prefix = hexPrefixEncode(key, true)
     return encodeList(prefix, value)
@@ -216,7 +216,7 @@ proc deleteAux(self: var HexaryTrie; rlpWriter: var RlpWriter;
   rlpWriter.appendAndSave(b, self.db)
   return true
 
-proc graft(self: var HexaryTrie; r: Rlp): BytesRange =
+proc graft(self: var HexaryTrie; r: Rlp): Bytes =
   assert r.isList and r.listLen == 2
   var (origIsLeaf, origPath) = r.extensionNodeKey
   var value = r.listElem(1)
@@ -237,7 +237,7 @@ proc graft(self: var HexaryTrie; r: Rlp): BytesRange =
   return rlpWriter.finish
 
 proc mergeAndGraft(self: var HexaryTrie;
-                   soleChild: Rlp, childPos: byte): BytesRange =
+                   soleChild: Rlp, childPos: byte): Bytes =
   var output = initRlpList(2)
   if childPos == 16:
     output.append hexPrefixEncode(zeroNibblesRange, true)
@@ -248,7 +248,7 @@ proc mergeAndGraft(self: var HexaryTrie;
   result = output.finish()
 
   if self.isTwoItemNode(soleChild):
-    result = self.graft(rlpFromBytes(result))
+    result = self.graft(rlpFromBytes(result.toRange))
 
 proc deleteAt(self: var HexaryTrie;
               origRlp: Rlp, key: NibblesRange): BytesRange =
@@ -261,7 +261,7 @@ proc deleteAt(self: var HexaryTrie;
     let (isLeaf, k) = origRlp.extensionNodeKey
     if k == key and isLeaf:
       self.dbDel origBytes
-      return emptyRlp
+      return emptyRlp.toRange
 
     if key.startsWith(k):
       var
@@ -272,10 +272,10 @@ proc deleteAt(self: var HexaryTrie;
       if not self.deleteAux(rlpWriter, value, key.slice(k.len)):
         return zeroBytesRange
       self.dbDel origBytes
-      var finalBytes = rlpWriter.finish
+      var finalBytes = rlpWriter.finish.toRange
       var rlp = rlpFromBytes(finalBytes)
       if self.isTwoItemNode(rlp.listElem(1)):
-        return self.graft(rlp)
+        return self.graft(rlp).toRange
       return finalBytes
     else:
       return zeroBytesRange
@@ -285,7 +285,7 @@ proc deleteAt(self: var HexaryTrie;
       var foundChildPos: byte
       let singleChild = origRlp.findSingleChild(foundChildPos)
       if singleChild.hasData and foundChildPos != 16:
-        result = self.mergeAndGraft(singleChild, foundChildPos)
+        result = self.mergeAndGraft(singleChild, foundChildPos).toRange
       else:
         var rlpRes = initRlpList(17)
         var iter = origRlp
@@ -294,7 +294,7 @@ proc deleteAt(self: var HexaryTrie;
           rlpRes.append iter
           iter.skipElem
         rlpRes.append ""
-        return rlpRes.finish
+        return rlpRes.finish.toRange
     else:
       var rlpWriter = initRlpList(17)
       let keyHead = int(key[0])
@@ -309,12 +309,12 @@ proc deleteAt(self: var HexaryTrie;
         inc i
 
       self.dbDel origBytes
-      result = rlpWriter.finish
+      result = rlpWriter.finish.toRange
       var resultRlp = rlpFromBytes(result)
       var foundChildPos: byte
       let singleChild = resultRlp.findSingleChild(foundChildPos)
       if singleChild.hasData:
-        result = self.mergeAndGraft(singleChild, foundChildPos)
+        result = self.mergeAndGraft(singleChild, foundChildPos).toRange
 
 proc del*(self: var HexaryTrie; key: BytesRange) =
   var
@@ -352,7 +352,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
              isInline = false): BytesRange =
   template origWithNewValue: auto =
     self.db.del(origHash.data)
-    replaceValue(orig, key, value)
+    replaceValue(orig, key, value).toRange
 
   if orig.isEmpty:
     return origWithNewValue()
@@ -371,7 +371,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       var r = initRlpList(2)
       r.append orig.listElem(0)
       self.mergeAtAux(r, origValue, key.slice(k.len), value)
-      return r.finish()
+      return r.finish.toRange
 
     if orig.rawData.len >= 32:
       self.db.del(origHash.data)
@@ -384,9 +384,9 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
 
       var top = initRlpList(2)
       top.append hexPrefixEncode(k.slice(0, sharedNibbles), false)
-      top.appendAndSave(bottom.finish(), self.db)
+      top.appendAndSave(bottom.finish.toRange, self.db)
 
-      return self.mergeAt(rlpFromBytes(top.finish()), key, value, true)
+      return self.mergeAt(rlpFromBytes(top.finish.toRange), key, value, true)
     else:
       # Create a branch node
       var branches = initRlpList(17)
@@ -402,7 +402,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
           if byte(i) == n:
             if isLeaf or k.len > 1:
               let childNode = encodeList(hexPrefixEncode(k.slice(1), isLeaf),
-                                         origValue)
+                                         origValue).toRange
               branches.appendAndSave(childNode, self.db)
             else:
               branches.append origValue
@@ -410,7 +410,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
             branches.append ""
         branches.append ""
 
-      return self.mergeAt(rlpFromBytes(branches.finish()), key, value, true)
+      return self.mergeAt(rlpFromBytes(branches.finish.toRange), key, value, true)
   else:
     if key.len == 0:
       return origWithNewValue()
@@ -430,7 +430,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
         r.append(elem)
       inc i
 
-    return r.finish()
+    return r.finish.toRange
 
 proc put*(self: var HexaryTrie; key, value: BytesRange) =
   let root = self.root.hash
