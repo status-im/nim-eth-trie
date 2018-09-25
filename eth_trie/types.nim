@@ -72,7 +72,7 @@ proc keccak*(r: BytesRange): KeccakHash =
 let
   # XXX: turning this into a constant leads to a compilation failure
   emptyRlp = rlp.encode ""
-  emptyRlpHash = emptyRlp.keccak
+  emptyRlpHash = emptyRlp.toRange.keccak
 
 proc get*(db: MemDB, key: openarray[byte]): Bytes =
   result = db.records.getOrDefault(@key).value
@@ -128,7 +128,7 @@ proc init(db: var MemDB) =
 proc newMemoryDB*: TrieDatabaseRef =
   new result
   discard result.beginTransaction
-  put(result, emptyRlpHash.data, emptyRlp.toOpenArray)
+  put(result, emptyRlpHash.data, emptyRlp)
 
 proc len*(db: MemDB): int =
   db.records.len
