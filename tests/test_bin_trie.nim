@@ -1,6 +1,7 @@
 import
-  eth_trie/[memdb, binary, constants, types],
-  unittest, test_utils, random
+  unittest, random,
+  eth_trie/[db, binary, constants],
+  test_utils
 
 suite "binary trie":
 

@@ -1,7 +1,8 @@
 import
-  rlp/types as rlpTypes, strutils,
-  nimcrypto/[hash, keccak], parseutils, types, binaries,
-  ranges/ptr_arith
+  strutils, parseutils,
+  rlp/types as rlpTypes, ranges/ptr_arith,
+  eth_common/eth_types, nimcrypto/[hash, keccak],
+  binaries
 
 #proc baseAddr*(x: Bytes): ptr byte = x[0].unsafeAddr
 

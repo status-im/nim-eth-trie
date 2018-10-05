@@ -1,6 +1,6 @@
 import
-  eth_trie/[memdb, binary, branches, types],
-  random, sets, unittest, strutils, sets
+  random, sets, unittest, strutils, sets,
+  eth_trie/[db, binary, branches]
 
 suite "branches utils":
 

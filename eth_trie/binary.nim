@@ -1,10 +1,9 @@
 import
-  ranges/[ptr_arith, typedranges, bitranges],
-  rlp/types as rlpTypes,
-  types, constants, binaries, utils
+  ranges/[ptr_arith, typedranges, bitranges], rlp/types,
+  db, constants, binaries, utils
 
 export
-  types, rlpTypes, utils
+  types, utils
 
 type
   DB = TrieDatabaseRef

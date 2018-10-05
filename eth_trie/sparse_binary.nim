@@ -1,10 +1,9 @@
 import
-  ranges/[ptr_arith, typedranges, bitranges],
-  rlp/types as rlpTypes, types, constants, utils,
-  sparse_proofs
+  ranges/[ptr_arith, typedranges, bitranges], rlp/types,
+  constants, utils, db, sparse_proofs
 
 export
-  types, rlpTypes, utils, bitranges,
+  types, utils, bitranges,
   sparse_proofs.verifyProof
 
 type

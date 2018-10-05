@@ -1,6 +1,6 @@
 import
   unittest, strutils, sequtils, os,
-  ranges/typedranges, eth_trie/[hexary, types, memdb], nimcrypto/utils,
+  ranges/typedranges, eth_trie/[hexary, db], nimcrypto/utils,
   test_utils
 
 template put(t: HexaryTrie|SecureHexaryTrie, key, val: string) =
