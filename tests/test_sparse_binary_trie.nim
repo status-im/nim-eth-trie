@@ -1,6 +1,7 @@
 import
-  eth_trie/[memdb, sparse_binary, constants, types, sparse_proofs],
-  unittest, test_utils, random
+  unittest, random,
+  eth_trie/[db, sparse_binary, constants, sparse_proofs],
+  test_utils
 
 suite "sparse binary trie":
   randomize()

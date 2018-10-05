@@ -1,11 +1,11 @@
 import
-  eth_trie/[memdb, binary, binaries, utils, branches, constants, types],
-  nimcrypto/[keccak, hash], unittest
+  unittest,
+  nimcrypto/[keccak, hash],
+  eth_trie/[db, binary, binaries, utils, branches, constants]
 
 suite "examples":
 
-  var memDB = newMemDB()
-  var db = trieDB memDB
+  var db = newMemoryDB()
   var trie = initBinaryTrie(db)
 
   test "basic set/get":
@@ -62,7 +62,7 @@ suite "examples":
     # ==> [A, B, C1, D1, C2, D2]
     check branch.len == 6
 
-  let beforeDeleteLen = memDB.len
+  let beforeDeleteLen = db.totalRecordsInMemoryDB
   test "verify intermediate entries existence":
     var branchs = getWitness(db, trie.getRootHash, zeroBytesRange)
     # set operation create new intermediate entries
@@ -81,7 +81,7 @@ suite "examples":
 
   test "prove the lie":
     # `delete` and `deleteSubtrie` not actually delete the nodes
-    check memDB.len == beforeDeleteLen
+    check db.totalRecordsInMemoryDB == beforeDeleteLen
     var branchs = getWitness(db, trie.getRootHash, zeroBytesRange)
     check branchs.len == 0
 

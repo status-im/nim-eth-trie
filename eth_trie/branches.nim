@@ -1,6 +1,6 @@
 import
-  rlp/types as rlpTypes, ranges/bitranges,
-  binary, binaries, memdb, types, utils
+  rlp/types, ranges/bitranges,
+  binary, binaries, db, utils
 
 type
   DB = TrieDatabaseRef

@@ -1,7 +1,7 @@
 import
   ranges/[typedranges, bitranges],
   rlp/types as rlpTypes,
-  types, constants, utils
+  db, constants, utils
 
 const
   treeHeight* = 160

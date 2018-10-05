@@ -1,6 +1,6 @@
 import
-  rlp/types as rlpTypes, types, sequtils,
-  ranges/[ptr_arith, bitranges]
+  sequtils,
+  ranges/[ptr_arith, bitranges], rlp/types
 
 type
   TrieNodeKind* = enum
