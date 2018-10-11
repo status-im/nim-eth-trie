@@ -1,13 +1,9 @@
 import
   tables, hashes, sets,
-  nimcrypto/[hash, keccak], rlp, eth_common/eth_types,
-  constants, db_tracing
-
-export KeccakHash
+  nimcrypto/[hash, keccak], rlp,
+  defs, db_tracing
 
 type
-  BytesContainer* = BytesRange | Bytes | string
-
   MemDBRec = object
     refCount: int
     value: Bytes

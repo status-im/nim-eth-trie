@@ -1,6 +1,6 @@
 import
   unittest, random,
-  eth_trie/[db, binary, constants],
+  eth_trie/[defs, db, binary],
   test_utils
 
 suite "binary trie":

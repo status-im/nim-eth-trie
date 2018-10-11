@@ -1,6 +1,6 @@
 import
   unittest, random,
-  eth_trie/[db, sparse_binary, constants, sparse_proofs],
+  eth_trie/[defs, db, sparse_binary, sparse_proofs],
   test_utils
 
 suite "sparse binary trie":

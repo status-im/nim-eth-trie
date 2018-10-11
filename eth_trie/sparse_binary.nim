@@ -1,6 +1,6 @@
 import
   ranges/[ptr_arith, typedranges, bitranges], rlp/types,
-  constants, utils, db, sparse_proofs
+  defs, utils, db, sparse_proofs
 
 export
   types, utils, bitranges,
@@ -11,9 +11,9 @@ type
 
   SparseBinaryTrie* = object
     db: DB
-    rootHash: BytesRange
+    rootHash: ByteRange
 
-proc `==`(a: BytesRange, b: KeccakHash): bool =
+proc `==`(a: ByteRange, b: KeccakHash): bool =
   if a.len != b.data.len: return false
   equalMem(a.baseAddr, b.data[0].unsafeAddr, a.len)
 
@@ -27,7 +27,7 @@ proc initDoubleHash(a, b: openArray[byte]): DoubleHash =
   copyMem(result[ 0].addr, a[0].unsafeAddr, 32)
   copyMem(result[32].addr, b[0].unsafeAddr, 32)
 
-proc initDoubleHash(x: BytesRange): DoubleHash =
+proc initDoubleHash(x: ByteRange): DoubleHash =
   initDoubleHash(x.toOpenArray, x.toOpenArray)
 
 proc init*(x: typedesc[SparseBinaryTrie], db: DB): SparseBinaryTrie =
@@ -57,10 +57,10 @@ proc initSparseBinaryTrie*(db: DB, rootHash: BytesContainer | KeccakHash): Spars
 
 proc getDB*(t: SparseBinaryTrie): auto = t.db
 
-proc getRootHash*(self: SparseBinaryTrie): BytesRange {.inline.} =
+proc getRootHash*(self: SparseBinaryTrie): ByteRange {.inline.} =
   self.rootHash
 
-proc getAux(self: SparseBinaryTrie, path: BitRange, rootHash: BytesRange): BytesRange =
+proc getAux(self: SparseBinaryTrie, path: BitRange, rootHash: ByteRange): ByteRange =
   var nodeHash = rootHash
   for targetBit in path:
     let value = self.db.get(nodeHash.toOpenArray).toRange
@@ -68,34 +68,34 @@ proc getAux(self: SparseBinaryTrie, path: BitRange, rootHash: BytesRange): Bytes
     if targetBit: nodeHash = value[32..^1]
     else: nodeHash = value[0..31]
 
-  if nodeHash == emptyLeafNodeHash:
+  if nodeHash.toOpenArray == emptyLeafNodeHash.data:
     result = zeroBytesRange
   else:
     result = self.db.get(nodeHash.toOpenArray).toRange
 
-proc get*(self: SparseBinaryTrie, key: BytesContainer): BytesRange =
+proc get*(self: SparseBinaryTrie, key: BytesContainer): ByteRange =
   ## gets a key from the tree.
   assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, self.rootHash)
 
-proc get*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): BytesRange =
+proc get*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): ByteRange =
   ## gets a key from the tree at a specific root.
   assert(key.len == pathByteLen)
   let path = MutByteRange(key.toRange).bits
   self.getAux(path, rootHash.toRange)
 
-proc hashAndSave*(self: SparseBinaryTrie, node: BytesRange): BytesRange =
+proc hashAndSave*(self: SparseBinaryTrie, node: ByteRange): ByteRange =
   result = keccakHash(node)
   self.db.put(result.toOpenArray, node.toOpenArray)
 
-proc hashAndSave*(self: SparseBinaryTrie, a, b: BytesRange): BytesRange =
+proc hashAndSave*(self: SparseBinaryTrie, a, b: ByteRange): ByteRange =
   let value = initDoubleHash(a.toOpenArray, b.toOpenArray)
   result = keccakHash(value)
   self.db.put(result.toOpenArray, value)
 
-proc setAux(self: var SparseBinaryTrie, value: BytesRange,
-    path: BitRange, depth: int, nodeHash: BytesRange): BytesRange =
+proc setAux(self: var SparseBinaryTrie, value: ByteRange,
+    path: BitRange, depth: int, nodeHash: ByteRange): ByteRange =
   if depth == treeHeight:
     result = self.hashAndSave(value)
   else:
@@ -115,7 +115,7 @@ proc set*(self: var SparseBinaryTrie, key, value: distinct BytesContainer) =
   let path = MutByteRange(key.toRange).bits
   self.rootHash = self.setAux(value.toRange, path, 0, self.rootHash)
 
-proc set*(self: var SparseBinaryTrie, key, value, rootHash: distinct BytesContainer): BytesRange =
+proc set*(self: var SparseBinaryTrie, key, value, rootHash: distinct BytesContainer): ByteRange =
   ## sets a new value for a key in the tree at a specific root,
   ## and returns the new root.
   assert(key.len == pathByteLen)
@@ -131,7 +131,7 @@ proc del*(self: var SparseBinaryTrie, key: BytesContainer) =
   self.set(key, zeroBytesRange)
 
 # Dictionary API
-template `[]`*(self: SparseBinaryTrie, key: BytesContainer): BytesRange =
+template `[]`*(self: SparseBinaryTrie, key: BytesContainer): ByteRange =
   self.get(key)
 
 template `[]=`*(self: var SparseBinaryTrie, key, value: distinct BytesContainer) =
@@ -140,7 +140,7 @@ template `[]=`*(self: var SparseBinaryTrie, key, value: distinct BytesContainer)
 template contains*(self: SparseBinaryTrie, key: BytesContainer): bool =
   self.exists(key)
 
-proc proveAux(self: SparseBinaryTrie, key, rootHash: BytesRange, output: var seq[BytesRange]): bool =
+proc proveAux(self: SparseBinaryTrie, key, rootHash: ByteRange, output: var seq[ByteRange]): bool =
   assert(key.len == pathByteLen)
   var currVal = self.db.get(rootHash.toOpenArray).toRange
   if currVal.len == 0: return false
@@ -160,23 +160,23 @@ proc proveAux(self: SparseBinaryTrie, key, rootHash: BytesRange, output: var seq
   result = true
 
 # prove generates a Merkle proof for a key.
-proc prove*(self: SparseBinaryTrie, key: BytesContainer): seq[BytesRange] =
-  result = newSeq[BytesRange](treeHeight)
+proc prove*(self: SparseBinaryTrie, key: BytesContainer): seq[ByteRange] =
+  result = newSeq[ByteRange](treeHeight)
   if not self.proveAux(key.toRange, self.rootHash, result):
     result = @[]
 
 # prove generates a Merkle proof for a key, at a specific root.
-proc prove*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): seq[BytesRange] =
-  result = newSeq[BytesRange](treeHeight)
+proc prove*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): seq[ByteRange] =
+  result = newSeq[ByteRange](treeHeight)
   if not self.proveAux(key.toRange, rootHash.toRange, result):
     result = @[]
 
 # proveCompact generates a compacted Merkle proof for a key.
-proc proveCompact*(self: SparseBinaryTrie, key: BytesContainer): seq[BytesRange] =
+proc proveCompact*(self: SparseBinaryTrie, key: BytesContainer): seq[ByteRange] =
   var temp = self.prove(key)
   temp.compactProof
 
 # proveCompact generates a compacted Merkle proof for a key, at a specific root.
-proc proveCompact*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): seq[BytesRange] =
+proc proveCompact*(self: SparseBinaryTrie, key, rootHash: distinct BytesContainer): seq[ByteRange] =
   var temp = self.prove(key, rootHash)
   temp.compactProof

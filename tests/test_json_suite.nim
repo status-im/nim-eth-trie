@@ -1,7 +1,7 @@
 import
   os, json, tables, sequtils, strutils, algorithm,
   rlp/types, nimcrypto/utils,
-  eth_trie/[hexary, constants, db],
+  eth_trie/[defs, db, hexary],
   test_utils
 
 proc `==`(lhs: JsonNode, rhs: string): bool =

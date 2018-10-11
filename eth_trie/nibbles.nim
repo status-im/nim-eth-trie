@@ -1,12 +1,12 @@
 import
-  rlp/types, constants
+  defs
 
 type
   NibblesRange* = object
-    bytes: BytesRange
+    bytes: ByteRange
     ibegin, iend: int
 
-proc initNibbleRange*(bytes: BytesRange): NibblesRange =
+proc initNibbleRange*(bytes: ByteRange): NibblesRange =
   result.bytes = bytes
   result.ibegin = 0
   result.iend = bytes.len * 2
@@ -90,7 +90,7 @@ proc sharedPrefixLen*(lhs, rhs: NibblesRange): int =
 proc startsWith*(lhs, rhs: NibblesRange): bool =
   sharedPrefixLen(lhs, rhs) == rhs.len
 
-proc hexPrefixDecode*(r: BytesRange): tuple[isLeaf: bool, nibbles: NibblesRange] =
+proc hexPrefixDecode*(r: ByteRange): tuple[isLeaf: bool, nibbles: NibblesRange] =
   result.nibbles = initNibbleRange(r)
   if r.len > 0:
     result.isLeaf = (r[0] and 0x20) != 0
@@ -100,7 +100,7 @@ proc hexPrefixDecode*(r: BytesRange): tuple[isLeaf: bool, nibbles: NibblesRange]
     result.isLeaf = false
 
 when false:
-  proc keyOf(r: BytesRange): NibblesRange =
+  proc keyOf(r: ByteRange): NibblesRange =
     let firstIdx = if r.len == 0: 0
                    elif (r[0] and 0x10) != 0: 1
                    else: 2

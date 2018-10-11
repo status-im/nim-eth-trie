@@ -1,8 +1,7 @@
 import
   tables,
-  nimcrypto/[keccak, hash, utils], ranges/ptr_arith,
-  rlp, eth_common/eth_types,
-  nibbles, constants, utils as trieUtils, db
+  nimcrypto/[keccak, hash, utils], ranges/ptr_arith, rlp,
+  defs, nibbles, utils as trieUtils, db
 
 type
   TrieNodeKey = object

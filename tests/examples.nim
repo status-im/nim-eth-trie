@@ -1,7 +1,7 @@
 import
   unittest,
   nimcrypto/[keccak, hash],
-  eth_trie/[db, binary, binaries, utils, branches, constants]
+  eth_trie/[defs, db, binary, binaries, utils, branches]
 
 suite "examples":
 
