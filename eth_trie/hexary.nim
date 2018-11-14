@@ -164,6 +164,45 @@ proc getLeaves*(self: HexaryTrie): seq[BytesRange] =
   var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
   self.db.getLeavesAux(nodeRlp, result)
 
+proc getKeysAux(db: DB, nodeRlp: Rlp, keys: var seq[ByteRange], path: NibblesRange) =
+  if not nodeRlp.hasData or nodeRlp.isEmpty:
+    return
+
+  case nodeRlp.listLen
+  of 2:
+    let
+      (isLeaf, k) = nodeRlp.extensionNodeKey
+      key = path & k
+    if isLeaf:
+      assert(key.len mod 2 == 0)
+      keys.add key.getBytes
+    else:
+      let
+        value = nodeRlp.listElem(1)
+        nextLookup = value.getLookup
+      db.getKeysAux(nextLookup, keys, key)
+  of 17:
+    var lastElem = nodeRlp.listElem(16)
+    if not lastElem.isEmpty:
+      assert(path.len mod 2 == 0)
+      keys.add path.getBytes
+    for i in 0 ..< 16:
+      var branch = nodeRlp.listElem(i)
+      if not branch.isEmpty:
+        let
+          nextLookup = branch.getLookup
+          key = path.pushBack(i.byte)
+        db.getKeysAux(nextLookup, keys, key)
+  else:
+    raise newException(CorruptedTrieError,
+                       "HexaryTrie node with an unexpected numbef or children")
+
+proc getKeys*(self: HexaryTrie): seq[BytesRange] =
+  result = @[]
+  var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
+  var path = newRange[byte](0)
+  self.db.getKeysAux(nodeRlp, result, initNibbleRange(path))
+
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
   if data.len >= 32: t.db.del(data.keccak.data)
 

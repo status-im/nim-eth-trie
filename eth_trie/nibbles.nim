@@ -99,6 +99,53 @@ proc hexPrefixDecode*(r: ByteRange): tuple[isLeaf: bool, nibbles: NibblesRange] 
   else:
     result.isLeaf = false
 
+template putNibble(x: untyped) =
+  if odd:
+    bytes[pos] = x shl 4
+  else:
+    bytes[pos] = bytes[pos] or x
+    inc pos
+
+template putNibbles(x: untyped) =
+  for i in 0 ..< x.len:
+    x[i].putNibble
+    odd = not odd
+
+proc `&`*(a, b: NibblesRange): NibblesRange =
+  let
+    len = a.len + b.len
+    bytesNeeded = len div 2 + len mod 2
+
+  var
+    bytes = newSeq[byte](bytesNeeded)
+    odd   = true
+    pos   = 0
+
+  a.putNibbles
+  b.putNibbles
+
+  result = initNibbleRange(bytes.toRange)
+  result.iend = len
+
+proc pushBack*(a: NibblesRange, b: byte): NibblesRange =
+  let
+    len = a.len + 1
+    bytesNeeded = len div 2 + len mod 2
+
+  var
+    bytes = newSeq[byte](bytesNeeded)
+    odd   = true
+    pos   = 0
+
+  a.putNibbles
+  b.putNibble
+
+  result = initNibbleRange(bytes.toRange)
+  result.iend = len
+
+proc getBytes*(a: NibblesRange): ByteRange =
+  a.bytes
+
 when false:
   proc keyOf(r: ByteRange): NibblesRange =
     let firstIdx = if r.len == 0: 0

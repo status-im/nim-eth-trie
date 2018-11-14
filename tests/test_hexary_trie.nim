@@ -98,7 +98,7 @@ suite "hexary trie":
     if a.lexComp(b): return 1
     return -1
 
-  test "get leaves":
+  test "get leaves and keys":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
@@ -124,7 +124,12 @@ suite "hexary trie":
     vals.sort(cmp)
     check leaves == vals
 
-  test "get leaves with random data":
+    var paths = trie.getKeys()
+    paths.sort(cmp)
+    keys.sort(cmp)
+    check paths == keys
+
+  test "get leaves and keys with random data":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
@@ -158,3 +163,9 @@ suite "hexary trie":
     leaves2.sort(cmp)
     vals2.sort(cmp)
     check leaves2 == vals2
+
+    var paths = trie.getKeys()
+    paths.sort(cmp)
+    keys2.add keys
+    keys2.sort(cmp)
+    check paths == keys2
