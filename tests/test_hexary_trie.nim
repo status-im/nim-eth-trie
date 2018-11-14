@@ -128,13 +128,33 @@ suite "hexary trie":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
-      keys = randList(BytesRange, randGen(5, 32), randGen(100, 100))
-      vals = randList(BytesRange, randGen(5, 99), randGen(100, 100))
+      keys = randList(BytesRange, randGen(5, 32), randGen(10, 10))
+      vals = randList(BytesRange, randGen(5, 7), randGen(10, 10))
+
+      keys2 = randList(BytesRange, randGen(5, 30), randGen(15, 15))
+      vals2 = randList(BytesRange, randGen(5, 7), randGen(15, 15))
 
     for i in 0 ..< keys.len:
       trie.put(keys[i], vals[i])
+
+    for i in 0 ..< keys.len:
+      check trie.get(keys[i]) == vals[i]
 
     var leaves = trie.getLeaves()
     leaves.sort(cmp)
     vals.sort(cmp)
     check leaves == vals
+
+    let rootHash = trie.rootHash
+    for i in 0 ..< keys2.len:
+      trie.put(keys2[i], vals2[i])
+    var trie2 = initHexaryTrie(memdb, rootHash)
+
+    leaves = trie2.getLeaves()
+    check leaves != vals
+
+    var leaves2 = trie.getLeaves()
+    vals2.add vals
+    leaves2.sort(cmp)
+    vals2.sort(cmp)
+    check leaves2 == vals2
