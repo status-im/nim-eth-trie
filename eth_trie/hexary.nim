@@ -95,7 +95,7 @@ proc getAuxByHash(db: DB, node: TrieNodeKey, path: NibblesRange): BytesRange =
 
 template getLookup(elem: untyped): untyped =
   if elem.isList: elem
-  else: rlpFromBytes(get(db, toopenArray(elem.expectHash)).toRange)
+  else: rlpFromBytes(get(db, toOpenArray(elem.expectHash)).toRange)
 
 proc getAux(db: DB, nodeRlp: Rlp, path: NibblesRange): BytesRange =
   if not nodeRlp.hasData or nodeRlp.isEmpty:
