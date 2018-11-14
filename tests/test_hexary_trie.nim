@@ -1,7 +1,7 @@
 import
   unittest, strutils, sequtils, os,
   ranges/typedranges, eth_trie/[hexary, db], nimcrypto/utils,
-  test_utils
+  test_utils, algorithm, rlp/types as rlpTypes
 
 template put(t: HexaryTrie|SecureHexaryTrie, key, val: string) =
   t.put(key.toBytesRange, val.toBytesRange)
@@ -78,3 +78,63 @@ suite "hexary trie":
 
       check tr.rootHashHex == "D7F8974FB5AC78D9AC099B9AD5018BEDC2CE0A72DAD1827A1709DA30580F0544"
 
+  proc lexComp(a, b: BytesRange): bool =
+    var
+      x = 0
+      y = 0
+      xlen = a.len
+      ylen = b.len
+
+    while x != xlen:
+      if y == ylen or b[y] < a[x]: return false
+      elif a[x] < b[y]: return true
+      inc x
+      inc y
+
+    result = y != ylen
+
+  proc cmp(a, b: BytesRange): int =
+    if a == b: return 0
+    if a.lexComp(b): return 1
+    return -1
+
+  test "get leaves":
+    var
+      memdb = newMemoryDB()
+      trie = initHexaryTrie(memdb)
+      keys = [
+        "key".toBytesRange,
+        "abc".toBytesRange,
+        "hola".toBytesRange,
+        "bubble".toBytesRange
+      ]
+
+      vals = [
+        "hello".toBytesRange,
+        "world".toBytesRange,
+        "block".toBytesRange,
+        "chain".toBytesRange
+      ]
+
+    for i in 0 ..< keys.len:
+      trie.put(keys[i], vals[i])
+
+    var leaves = trie.getLeaves()
+    leaves.sort(cmp)
+    vals.sort(cmp)
+    check leaves == vals
+
+  test "get leaves with random data":
+    var
+      memdb = newMemoryDB()
+      trie = initHexaryTrie(memdb)
+      keys = randList(BytesRange, randGen(5, 32), randGen(100, 100))
+      vals = randList(BytesRange, randGen(5, 99), randGen(100, 100))
+
+    for i in 0 ..< keys.len:
+      trie.put(keys[i], vals[i])
+
+    var leaves = trie.getLeaves()
+    leaves.sort(cmp)
+    vals.sort(cmp)
+    check leaves == vals
