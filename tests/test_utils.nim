@@ -24,11 +24,23 @@ proc randString*(len: int): string =
   for i in 0..<len:
     result[i] = rand(255).char
 
+proc toBytesRange*(str: string): BytesRange =
+  var s: seq[byte]
+  if str[0] == '0' and str[1] == 'x':
+    s = fromHex(str.substr(2))
+  else:
+    s = newSeq[byte](str.len)
+    for i in 0 ..< str.len:
+      s[i] = byte(str[i])
+  result = s.toRange
+
 proc randPrimitives*[T](val: int): T =
   when T is string:
     randString(val)
   elif T is int:
     result = val
+  elif T is BytesRange:
+    result = randString(val).toBytesRange
 
 proc randList*(T: typedesc, strGen, listGen: RandGen, unique: bool = true): seq[T] =
   let listLen = listGen.getVal()
@@ -60,16 +72,6 @@ proc toBytes*(str: string): Bytes =
   result = newSeq[byte](str.len)
   for i in 0..<str.len:
     result[i] = byte(str[i])
-
-proc toBytesRange*(str: string): BytesRange =
-  var s: seq[byte]
-  if str[0] == '0' and str[1] == 'x':
-    s = fromHex(str.substr(2))
-  else:
-    s = newSeq[byte](str.len)
-    for i in 0 ..< str.len:
-      s[i] = byte(str[i])
-  result = s.toRange
 
 proc genBitVec*(len: int): BitRange =
   let k = ((len + 7) and (not 7)) shr 3
