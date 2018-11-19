@@ -114,7 +114,7 @@ template putNibbles(x: untyped) =
 proc `&`*(a, b: NibblesRange): NibblesRange =
   let
     len = a.len + b.len
-    bytesNeeded = len div 2 + len mod 2
+    bytesNeeded = (len shr 1) + (len and 1)
 
   var
     bytes = newSeq[byte](bytesNeeded)
@@ -130,7 +130,7 @@ proc `&`*(a, b: NibblesRange): NibblesRange =
 proc pushBack*(a: NibblesRange, b: byte): NibblesRange =
   let
     len = a.len + 1
-    bytesNeeded = len div 2 + len mod 2
+    bytesNeeded = (len shr 1) + (len and 1)
 
   var
     bytes = newSeq[byte](bytesNeeded)
