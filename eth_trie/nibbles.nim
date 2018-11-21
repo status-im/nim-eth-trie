@@ -39,7 +39,7 @@ proc `$`*(r: NibblesRange): string =
   result = newStringOfCap(100)
   for i in r.ibegin ..< r.iend:
     let n = int r{i}
-    let c = if n > 9: char(ord('a') + n)
+    let c = if n > 9: char(ord('a') + n - 10)
             else: char(ord('0') + n)
     result.add c
 
@@ -99,49 +99,57 @@ proc hexPrefixDecode*(r: ByteRange): tuple[isLeaf: bool, nibbles: NibblesRange] 
   else:
     result.isLeaf = false
 
-template putNibble(x: untyped) =
+template putNibble(bytes, x: untyped) =
   if odd:
-    bytes[pos] = x shl 4
-  else:
-    bytes[pos] = bytes[pos] or x
+    bytes[pos] = (bytes[pos] and 0xF0) or x
     inc pos
+  else:
+    bytes[pos] = x shl 4
 
-template putNibbles(x: untyped) =
-  for i in 0 ..< x.len:
-    x[i].putNibble
+template putNibbles(bytes, src: untyped) =
+  for i in 0 ..< src.len:
+    bytes.putNibble(src[i])
     odd = not odd
+
+template calcNeededBytes(len: int): int =
+  (len shr 1) + (len and 1)
 
 proc `&`*(a, b: NibblesRange): NibblesRange =
   let
     len = a.len + b.len
-    bytesNeeded = (len shr 1) + (len and 1)
+    bytesNeeded = calcNeededBytes(len)
 
   var
     bytes = newSeq[byte](bytesNeeded)
-    odd   = true
+    odd   = false
     pos   = 0
 
-  a.putNibbles
-  b.putNibbles
+  bytes.putNibbles(a)
+  bytes.putNibbles(b)
 
   result = initNibbleRange(bytes.toRange)
   result.iend = len
 
-proc pushBack*(a: NibblesRange, b: byte): NibblesRange =
+proc cloneAndReserveNibble*(a: NibblesRange): NibblesRange =
   let
     len = a.len + 1
-    bytesNeeded = (len shr 1) + (len and 1)
+    bytesNeeded = calcNeededBytes(len)
 
   var
     bytes = newSeq[byte](bytesNeeded)
-    odd   = true
+    odd   = false
     pos   = 0
 
-  a.putNibbles
-  b.putNibble
-
+  bytes.putNibbles(a)
   result = initNibbleRange(bytes.toRange)
   result.iend = len
+
+proc replaceLastNibble*(a: var NibblesRange, b: byte) =
+  var
+    odd = (a.len and 1) == 0
+    pos = (a.len shr 1) - odd.int
+
+  putNibble(MutRange[byte](a.bytes), b)
 
 proc getBytes*(a: NibblesRange): ByteRange =
   a.bytes

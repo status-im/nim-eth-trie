@@ -126,43 +126,43 @@ proc getAux(db: DB, nodeRlp: Rlp, path: NibblesRange): BytesRange =
       return getAux(db, nextLookup, path.slice(1))
   else:
     raise newException(CorruptedTrieError,
-                       "HexaryTrie node with an unexpected numbef or children")
+                       "HexaryTrie node with an unexpected number of children")
 
 proc get*(self: HexaryTrie; key: BytesRange): BytesRange =
   return getAuxByHash(self.db, self.root, initNibbleRange(key))
 
-proc getLeavesAux(db: DB, nodeRlp: Rlp, leaves: var seq[BytesRange]) =
+proc getValuesAux(db: DB, nodeRlp: Rlp, leaves: var seq[BytesRange]) =
   if not nodeRlp.hasData or nodeRlp.isEmpty:
     return
 
   case nodeRlp.listLen
   of 2:
     let
-      (isLeaf, k) = nodeRlp.extensionNodeKey
+      (isLeaf, _) = nodeRlp.extensionNodeKey
       value = nodeRlp.listElem(1)
 
     if isLeaf:
       leaves.add value.toBytes
     else:
       let nextLookup = value.getLookup
-      db.getLeavesAux(nextLookup, leaves)
+      db.getValuesAux(nextLookup, leaves)
   of 17:
-    var lastElem = nodeRlp.listElem(16)
-    if not lastElem.isEmpty:
-      leaves.add lastElem.toBytes
     for i in 0 ..< 16:
       var branch = nodeRlp.listElem(i)
       if not branch.isEmpty:
         let nextLookup = branch.getLookup
-        db.getLeavesAux(nextLookup, leaves)
+        db.getValuesAux(nextLookup, leaves)
+    var lastElem = nodeRlp.listElem(16)
+    if not lastElem.isEmpty:
+      leaves.add lastElem.toBytes
   else:
     raise newException(CorruptedTrieError,
-                       "HexaryTrie node with an unexpected numbef or children")
+                       "HexaryTrie node with an unexpected number of children")
 
-proc getLeaves*(self: HexaryTrie): seq[BytesRange] =
+proc getValues*(self: HexaryTrie): seq[BytesRange] =
   result = @[]
   var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
-  self.db.getLeavesAux(nodeRlp, result)
+  self.db.getValuesAux(nodeRlp, result)
 
 proc getKeysAux(db: DB, nodeRlp: Rlp, keys: var seq[ByteRange], path: NibblesRange) =
   if not nodeRlp.hasData or nodeRlp.isEmpty:
@@ -182,26 +182,158 @@ proc getKeysAux(db: DB, nodeRlp: Rlp, keys: var seq[ByteRange], path: NibblesRan
         nextLookup = value.getLookup
       db.getKeysAux(nextLookup, keys, key)
   of 17:
+    var key = path.cloneAndReserveNibble()
+    for i in 0 ..< 16:
+      var branch = nodeRlp.listElem(i)
+      if not branch.isEmpty:
+        let nextLookup = branch.getLookup
+        key.replaceLastNibble(i.byte)
+        db.getKeysAux(nextLookup, keys, key)
+
     var lastElem = nodeRlp.listElem(16)
     if not lastElem.isEmpty:
       assert(path.len mod 2 == 0)
       keys.add path.getBytes
-    for i in 0 ..< 16:
-      var branch = nodeRlp.listElem(i)
-      if not branch.isEmpty:
-        let
-          nextLookup = branch.getLookup
-          key = path.pushBack(i.byte)
-        db.getKeysAux(nextLookup, keys, key)
   else:
     raise newException(CorruptedTrieError,
-                       "HexaryTrie node with an unexpected numbef or children")
+                       "HexaryTrie node with an unexpected number of children")
 
 proc getKeys*(self: HexaryTrie): seq[BytesRange] =
   result = @[]
   var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
   var path = newRange[byte](0)
   self.db.getKeysAux(nodeRlp, result, initNibbleRange(path))
+
+proc getKeysAux(db: DB, stack: var seq[tuple[nodeRlp: Rlp, path: NibblesRange]]): BytesRange =
+  while stack.len > 0:
+    let (nodeRlp, path) = stack.pop()
+    if not nodeRlp.hasData or nodeRlp.isEmpty:
+      continue
+
+    case nodeRlp.listLen
+    of 2:
+      let
+        (isLeaf, k) = nodeRlp.extensionNodeKey
+        key = path & k
+
+      if isLeaf:
+        assert(key.len mod 2 == 0)
+        return key.getBytes
+      else:
+        let
+          value = nodeRlp.listElem(1)
+          nextLookup = value.getLookup
+        stack.add((nextLookup, key))
+    of 17:
+      for i in 0 ..< 16:
+        var branch = nodeRlp.listElem(i)
+        if not branch.isEmpty:
+          let nextLookup = branch.getLookup
+          var key = path.cloneAndReserveNibble()
+          key.replaceLastNibble(i.byte)
+          stack.add((nextLookup, key))
+
+      var lastElem = nodeRlp.listElem(16)
+      if not lastElem.isEmpty:
+        assert(path.len mod 2 == 0)
+        return path.getBytes
+    else:
+      raise newException(CorruptedTrieError,
+                        "HexaryTrie node with an unexpected number of children")
+
+iterator keys*(self: HexaryTrie): BytesRange =
+  var
+    nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
+    path = newRange[byte](0)
+    stack = @[(nodeRlp, initNibbleRange(path))]
+  while stack.len > 0:
+    yield getKeysAux(self.db, stack)
+
+proc getValuesAux(db: DB, stack: var seq[Rlp]): BytesRange =
+  while stack.len > 0:
+    let nodeRlp = stack.pop()
+    if not nodeRlp.hasData or nodeRlp.isEmpty:
+      continue
+
+    case nodeRlp.listLen
+    of 2:
+      let
+        (isLeaf, _) = nodeRlp.extensionNodeKey
+        value = nodeRlp.listElem(1)
+
+      if isLeaf:
+        return value.toBytes
+      else:
+        let nextLookup = value.getLookup
+        stack.add(nextLookup)
+    of 17:
+      for i in 0 ..< 16:
+        var branch = nodeRlp.listElem(i)
+        if not branch.isEmpty:
+          let nextLookup = branch.getLookup
+          stack.add(nextLookup)
+
+      var lastElem = nodeRlp.listElem(16)
+      if not lastElem.isEmpty:
+        return lastElem.toBytes
+    else:
+      raise newException(CorruptedTrieError,
+                        "HexaryTrie node with an unexpected number of children")
+
+iterator values*(self: HexaryTrie): BytesRange =
+  var
+    nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
+    stack = @[nodeRlp]
+  while stack.len > 0:
+    yield getValuesAux(self.db, stack)
+
+proc getPairsAux(db: DB, stack: var seq[tuple[nodeRlp: Rlp, path: NibblesRange]]): (BytesRange, BytesRange) =
+  while stack.len > 0:
+    let (nodeRlp, path) = stack.pop()
+    if not nodeRlp.hasData or nodeRlp.isEmpty:
+      continue
+
+    case nodeRlp.listLen
+    of 2:
+      let
+        (isLeaf, k) = nodeRlp.extensionNodeKey
+        key = path & k
+        value = nodeRlp.listElem(1)
+
+      if isLeaf:
+        assert(key.len mod 2 == 0)
+        return (key.getBytes, value.toBytes)
+      else:
+        let nextLookup = value.getLookup
+        stack.add((nextLookup, key))
+    of 17:
+      for i in 0 ..< 16:
+        var branch = nodeRlp.listElem(i)
+        if not branch.isEmpty:
+          let nextLookup = branch.getLookup
+          var key = path.cloneAndReserveNibble()
+          key.replaceLastNibble(i.byte)
+          stack.add((nextLookup, key))
+
+      var lastElem = nodeRlp.listElem(16)
+      if not lastElem.isEmpty:
+        assert(path.len mod 2 == 0)
+        return (path.getBytes, lastElem.toBytes)
+    else:
+      raise newException(CorruptedTrieError,
+                        "HexaryTrie node with an unexpected number of children")
+
+iterator pairs*(self: HexaryTrie): (BytesRange, BytesRange) =
+  var
+    nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
+    path = newRange[byte](0)
+    stack = @[(nodeRlp, initNibbleRange(path))]
+  while stack.len > 0:
+    # perhaps a Nim bug #9778
+    # cannot yield the helper proc directly
+    # it will cut the yield in half
+    let res = getPairsAux(self.db, stack)
+    yield res
 
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
   if data.len >= 32: t.db.del(data.keccak.data)

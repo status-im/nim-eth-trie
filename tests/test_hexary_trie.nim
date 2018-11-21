@@ -98,7 +98,7 @@ suite "hexary trie":
     if a.lexComp(b): return 1
     return -1
 
-  test "get leaves and keys":
+  test "get values and keys":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
@@ -119,17 +119,35 @@ suite "hexary trie":
     for i in 0 ..< keys.len:
       trie.put(keys[i], vals[i])
 
-    var leaves = trie.getLeaves()
-    leaves.sort(cmp)
+    var values = trie.getValues()
+    values.sort(cmp)
     vals.sort(cmp)
-    check leaves == vals
+    check values == vals
 
     var paths = trie.getKeys()
     paths.sort(cmp)
     keys.sort(cmp)
     check paths == keys
 
-  test "get leaves and keys with random data":
+    paths.setLen(0)
+    for k in trie.keys:
+      paths.add(k)
+    paths.sort(cmp)
+    keys.sort(cmp)
+    check paths == keys
+
+    values.setLen(0)
+    paths.setLen(0)
+    for k, v in trie:
+      paths.add k
+      values.add v
+
+    paths.sort(cmp)
+    values.sort(cmp)
+    check paths == keys
+    check values == vals
+
+  test "get values and keys with random data":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
@@ -145,27 +163,50 @@ suite "hexary trie":
     for i in 0 ..< keys.len:
       check trie.get(keys[i]) == vals[i]
 
-    var leaves = trie.getLeaves()
-    leaves.sort(cmp)
+    var values = trie.getValues()
+    values.sort(cmp)
     vals.sort(cmp)
-    check leaves == vals
+    check values == vals
 
     let rootHash = trie.rootHash
     for i in 0 ..< keys2.len:
       trie.put(keys2[i], vals2[i])
     var trie2 = initHexaryTrie(memdb, rootHash)
 
-    leaves = trie2.getLeaves()
-    check leaves != vals
+    values = trie2.getValues()
+    check values != vals
 
-    var leaves2 = trie.getLeaves()
+    var values2 = trie.getValues()
     vals2.add vals
-    leaves2.sort(cmp)
+    values2.sort(cmp)
     vals2.sort(cmp)
-    check leaves2 == vals2
+    check values2 == vals2
+
+    values2.setLen(0)
+    for k in trie.values:
+      values2.add(k)
+    values2.sort(cmp)
+    check values2 == vals2
 
     var paths = trie.getKeys()
     paths.sort(cmp)
     keys2.add keys
     keys2.sort(cmp)
     check paths == keys2
+
+    paths.setLen(0)
+    for k in trie.keys:
+      paths.add(k)
+    paths.sort(cmp)
+    check paths == keys2
+
+    values.setLen(0)
+    paths.setLen(0)
+    for k, v in trie:
+      paths.add k
+      values.add v
+
+    paths.sort(cmp)
+    values.sort(cmp)
+    check paths == keys2
+    check values == vals2
