@@ -1,7 +1,7 @@
 import
   unittest, strutils, sequtils, os,
   ranges/typedranges, eth_trie/[hexary, db, defs], nimcrypto/utils,
-  test_utils, algorithm, rlp/types as rlpTypes
+  test_utils, algorithm, rlp/types as rlpTypes, random
 
 template put(t: HexaryTrie|SecureHexaryTrie, key, val: string) =
   t.put(key.toBytesRange, val.toBytesRange)
@@ -100,6 +100,7 @@ suite "hexary trie":
     return -1
 
   test "get values and keys":
+    randomize()
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
@@ -266,32 +267,49 @@ suite "hexary trie":
 
     const
       listLength = 30
-    var
-      memdb = newMemoryDB()
-      nonPruningTrie = initHexaryTrie(memdb, false)
-      keys = randList(BytesRange, randGen(5, 77), randGen(listLength))
-      values = randList(BytesRange, randGen(1, 57), randGen(listLength))
-      historyList = newSeq[History](listLength)
+      numLoop = 100
 
-    for i, k in keys:
-      historyList[i].keys = newSeq[BytesRange](i + 1)
-      historyList[i].values = newSeq[BytesRange](i + 1)
-      for x in 0 ..< i + 1:
-        historyList[i].keys[x] = keys[x]
-        historyList[i].values[x] = values[x]
-      nonPruningTrie.put(keys[i], values[i])
-      historyList[i].rootHash = nonPruningTrie.rootHash
-      historyList[i].keys.sort(cmp)
-      historyList[i].values.sort(cmp)
-
-    for h in historyList:
+    for iteration in 0 ..< numLoop:
       var
-        trie = initHexaryTrie(memdb, h.rootHash)
-        pKeys = trie.getKeys()
-        pValues = trie.getValues()
-      pKeys.sort(cmp)
-      pValues.sort(cmp)
-      check pKeys.len == h.keys.len
-      check pValues.len == h.values.len
-      check pKeys == h.keys
-      check pValues == h.values
+        memdb = newMemoryDB()
+        nonPruningTrie = initHexaryTrie(memdb, false)
+        keys = randList(BytesRange, randGen(3, 33), randGen(listLength))
+        values = randList(BytesRange, randGen(5, 77), randGen(listLength))
+        historyList = newSeq[History](listLength)
+        ok = true
+
+      for i, k in keys:
+        historyList[i].keys = newSeq[BytesRange](i + 1)
+        historyList[i].values = newSeq[BytesRange](i + 1)
+        for x in 0 ..< i + 1:
+          historyList[i].keys[x] = keys[x]
+          historyList[i].values[x] = values[x]
+        nonPruningTrie.put(keys[i], values[i])
+        historyList[i].rootHash = nonPruningTrie.rootHash
+        historyList[i].keys.sort(cmp)
+        historyList[i].values.sort(cmp)
+
+      for h in historyList:
+        var
+          trie = initHexaryTrie(memdb, h.rootHash)
+          pKeys: seq[BytesRange] = @[]
+          pValues = trie.getValues()
+
+        for k in trie.keys:
+          pKeys.add k
+        pKeys.sort(cmp)
+        pValues.sort(cmp)
+        check pKeys.len == h.keys.len
+        check pValues.len == h.values.len
+        check pKeys == h.keys
+        check pValues == h.values
+
+        ok = ok and pKeys.len == h.keys.len
+        ok = ok and pValues.len == h.values.len
+        ok = ok and pKeys == h.keys
+        ok = ok and pValues == h.values
+        if not ok: break
+
+      if not ok:
+        echo "ITERATION: ", iteration
+        break
