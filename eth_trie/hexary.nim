@@ -137,79 +137,6 @@ proc getAux(db: DB, nodeRlp: Rlp, path: NibblesRange): BytesRange =
 proc get*(self: HexaryTrie; key: BytesRange): BytesRange =
   return getAuxByHash(self.db, self.root, initNibbleRange(key))
 
-proc getValuesAux(db: DB, nodeRlp: Rlp, leaves: var seq[BytesRange]) =
-  if not nodeRlp.hasData or nodeRlp.isEmpty:
-    return
-
-  case nodeRlp.listLen
-  of 2:
-    let
-      (isLeaf, _) = nodeRlp.extensionNodeKey
-      value = nodeRlp.listElem(1)
-
-    if isLeaf:
-      leaves.add value.toBytes
-    else:
-      let nextLookup = value.getLookup
-      db.getValuesAux(nextLookup, leaves)
-  of 17:
-    for i in 0 ..< 16:
-      var branch = nodeRlp.listElem(i)
-      if not branch.isEmpty:
-        let nextLookup = branch.getLookup
-        db.getValuesAux(nextLookup, leaves)
-    var lastElem = nodeRlp.listElem(16)
-    if not lastElem.isEmpty:
-      leaves.add lastElem.toBytes
-  else:
-    raise newException(CorruptedTrieError,
-                       "HexaryTrie node with an unexpected number of children")
-
-proc getValues*(self: HexaryTrie): seq[BytesRange] =
-  result = @[]
-  var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
-  self.db.getValuesAux(nodeRlp, result)
-
-proc getKeysAux(db: DB, nodeRlp: Rlp, keys: var seq[ByteRange], path: NibblesRange) =
-  if not nodeRlp.hasData or nodeRlp.isEmpty:
-    return
-
-  case nodeRlp.listLen
-  of 2:
-    let
-      (isLeaf, k) = nodeRlp.extensionNodeKey
-      key = path & k
-    if isLeaf:
-      assert(key.len mod 2 == 0)
-      keys.add key.getBytes
-    else:
-      let
-        value = nodeRlp.listElem(1)
-        nextLookup = value.getLookup
-      db.getKeysAux(nextLookup, keys, key)
-  of 17:
-    var key = path.cloneAndReserveNibble()
-    for i in 0 ..< 16:
-      var branch = nodeRlp.listElem(i)
-      if not branch.isEmpty:
-        let nextLookup = branch.getLookup
-        key.replaceLastNibble(i.byte)
-        db.getKeysAux(nextLookup, keys, key)
-
-    var lastElem = nodeRlp.listElem(16)
-    if not lastElem.isEmpty:
-      assert(path.len mod 2 == 0)
-      keys.add path.getBytes
-  else:
-    raise newException(CorruptedTrieError,
-                       "HexaryTrie node with an unexpected number of children")
-
-proc getKeys*(self: HexaryTrie): seq[BytesRange] =
-  result = @[]
-  var nodeRlp = rlpFromBytes keyToLocalBytes(self.db, self.root)
-  var path = newRange[byte](0)
-  self.db.getKeysAux(nodeRlp, result, initNibbleRange(path))
-
 proc getKeysAux(db: DB, stack: var seq[tuple[nodeRlp: Rlp, path: NibblesRange]]): BytesRange =
   while stack.len > 0:
     let (nodeRlp, path) = stack.pop()
@@ -341,6 +268,16 @@ iterator pairs*(self: HexaryTrie): (BytesRange, BytesRange) =
     let res = getPairsAux(self.db, stack)
     yield res
 
+proc getValues*(self: HexaryTrie): seq[BytesRange] =
+  result = @[]
+  for v in self.values:
+    result.add v
+
+proc getKeys*(self: HexaryTrie): seq[BytesRange] =
+  result = @[]
+  for k in self.keys:
+    result.add k
+
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
   if data.len >= 32: t.db.del(data.keccak.data)
 
@@ -433,7 +370,7 @@ proc graft(self: var HexaryTrie; r: Rlp): Bytes =
   if not value.isList:
     let nodeKey = value.expectHash
     var resolvedData = self.db.get(nodeKey.toOpenArray).toRange
-    self.db.del(nodeKey.toOpenArray)
+    self.prune(nodeKey.toOpenArray)
     value = rlpFromBytes resolvedData
 
   assert value.listLen == 2
@@ -649,7 +586,7 @@ proc put*(self: var HexaryTrie; key, value: BytesRange) =
   let newRootBytes = self.mergeAt(rlpFromBytes(rootBytes), root,
                                   initNibbleRange(key), value)
   if rootBytes.len < 32:
-    self.db.del(root.data)
+    self.prune(root.data)
 
   self.root = self.db.dbPut(newRootBytes)
 

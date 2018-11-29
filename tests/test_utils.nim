@@ -1,5 +1,5 @@
 import
-  random, sets,
+  random, sets, ../eth_trie/utils as ethUtils,
   rlp/types as rlpTypes, ranges/bitranges, nimcrypto/utils
 
 type
@@ -43,7 +43,7 @@ proc randPrimitives*[T](val: int): T =
   elif T is int:
     result = val
   elif T is BytesRange:
-    result = randString(val).toBytesRange
+    result = randString(val).toRange
 
 proc randList*(T: typedesc, strGen, listGen: RandGen, unique: bool = true): seq[T] =
   let listLen = listGen.getVal()
