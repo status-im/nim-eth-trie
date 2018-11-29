@@ -151,11 +151,11 @@ suite "hexary trie":
     var
       memdb = newMemoryDB()
       trie = initHexaryTrie(memdb)
-      keys = randList(BytesRange, randGen(5, 32), randGen(10, 10))
-      vals = randList(BytesRange, randGen(5, 7), randGen(10, 10))
+      keys = randList(BytesRange, randGen(5, 32), randGen(10))
+      vals = randList(BytesRange, randGen(5, 7), randGen(10))
 
-      keys2 = randList(BytesRange, randGen(5, 30), randGen(15, 15))
-      vals2 = randList(BytesRange, randGen(5, 7), randGen(15, 15))
+      keys2 = randList(BytesRange, randGen(5, 30), randGen(15))
+      vals2 = randList(BytesRange, randGen(5, 7), randGen(15))
 
     for i in 0 ..< keys.len:
       trie.put(keys[i], vals[i])
@@ -173,7 +173,9 @@ suite "hexary trie":
       trie.put(keys2[i], vals2[i])
     var trie2 = initHexaryTrie(memdb, rootHash)
 
+    # because of pruning, there is no equality
     values = trie2.getValues()
+    values.sort(cmp)
     check values != vals
 
     var values2 = trie.getValues()
@@ -210,3 +212,43 @@ suite "hexary trie":
     values.sort(cmp)
     check paths == keys2
     check values == vals2
+
+  test "non-pruning mode":
+    var
+      memdb = newMemoryDB()
+      nonPruningTrie = initHexaryTrie(memdb, false)
+      keys = randList(BytesRange, randGen(5, 77), randGen(30))
+      vals = randList(BytesRange, randGen(1, 57), randGen(30))
+
+      moreKeys = randList(BytesRange, randGen(5, 33), randGen(45))
+      moreVals = randList(BytesRange, randGen(1, 47), randGen(45))
+
+    for i in 0 ..< keys.len:
+      nonPruningTrie.put(keys[i], vals[i])
+
+    let rootHash = nonPruningTrie.rootHash
+    for i in 0 ..< moreKeys.len:
+      nonPruningTrie.put(moreKeys[i], moreVals[i])
+
+    var
+      readOnlyTrie = initHexaryTrie(memdb, rootHash)
+      secondaryTrie = initHexaryTrie(memdb, rootHash, false)
+
+    keys.sort(cmp)
+    vals.sort(cmp)
+
+    var
+      roKeys = readOnlyTrie.getKeys()
+      roValues = readOnlyTrie.getValues()
+      scKeys = secondaryTrie.getKeys()
+      scValues = secondaryTrie.getValues()
+
+    roKeys.sort(cmp)
+    roValues.sort(cmp)
+    scKeys.sort(cmp)
+    scValues.sort(cmp)
+
+    check keys == roKeys
+    check vals == roValues
+    check keys == scKeys
+    check vals == scValues
