@@ -15,6 +15,9 @@ proc randGen*[T](minVal, maxVal: T): RandGen[T] =
   result.minVal = minVal
   result.maxVal = maxVal
 
+proc randGen*[T](minMax: T): RandGen[T] =
+  randGen(minMax, minMax)
+
 proc getVal*[T](x: RandGen[T]): T =
   if x.minVal == x.maxVal: return x.minVal
   rand(x.minVal..x.maxVal)

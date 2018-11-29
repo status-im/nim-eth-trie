@@ -13,6 +13,7 @@ type
   HexaryTrie* = object
     db*: DB
     root: TrieNodeKey
+    isPruning: bool
 
   SecureHexaryTrie* = distinct HexaryTrie
 
@@ -47,26 +48,31 @@ converter toTrieNodeKey(hash: KeccakHash): TrieNodeKey =
   result.hash = hash
   result.usedBytes = 32
 
-proc initHexaryTrie*(db: DB, rootHash: KeccakHash): HexaryTrie =
+proc initHexaryTrie*(db: DB, rootHash: KeccakHash, isPruning = true): HexaryTrie =
   result.db = db
   result.root = rootHash
+  result.isPruning = isPruning
 
-template initSecureHexaryTrie*(db: DB, rootHash: KeccakHash): SecureHexaryTrie =
-  SecureHexaryTrie initHexaryTrie(db, rootHash)
+template initSecureHexaryTrie*(db: DB, rootHash: KeccakHash, isPruning = true): SecureHexaryTrie =
+  SecureHexaryTrie initHexaryTrie(db, rootHash, isPruning)
 
 let
   # XXX: turning this into a constant leads to a compilation failure
   emptyRlp = rlp.encode ""
 
-proc initHexaryTrie*(db: DB): HexaryTrie =
+proc initHexaryTrie*(db: DB, isPruning = true): HexaryTrie =
   result.db = db
   result.root = result.db.dbPut(emptyRlp.toRange)
+  result.isPruning = isPruning
 
 proc rootHash*(t: HexaryTrie): KeccakHash =
   t.root.hash
 
 proc rootHashHex*(t: HexaryTrie): string =
   $t.root.hash
+
+template prune(t: HexaryTrie, x: openArray[byte]) =
+  if t.isPruning: t.db.del(x)
 
 proc getLocalBytes(x: TrieNodeKey): BytesRange =
   ## This proc should be used on nodes using the optimization
@@ -576,7 +582,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       return r.finish.toRange
 
     if orig.rawData.len >= 32:
-      self.db.del(origHash.data)
+      self.prune(origHash.data)
 
     if sharedNibbles > 0:
       # Split the extension node
