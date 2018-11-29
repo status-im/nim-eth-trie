@@ -1,6 +1,6 @@
 import
   unittest, strutils, sequtils, os,
-  ranges/typedranges, eth_trie/[hexary, db], nimcrypto/utils,
+  ranges/typedranges, eth_trie/[hexary, db, defs], nimcrypto/utils,
   test_utils, algorithm, rlp/types as rlpTypes
 
 template put(t: HexaryTrie|SecureHexaryTrie, key, val: string) =
@@ -78,6 +78,7 @@ suite "hexary trie":
 
       check tr.rootHashHex == "D7F8974FB5AC78D9AC099B9AD5018BEDC2CE0A72DAD1827A1709DA30580F0544"
 
+  # lexicographic comparison
   proc lexComp(a, b: BytesRange): bool =
     var
       x = 0
@@ -255,3 +256,42 @@ suite "hexary trie":
     check vals == roValues
     check keys == scKeys
     check vals == scValues
+
+  test "elaborate non-pruning test":
+    type
+      History = object
+        keys: seq[BytesRange]
+        values: seq[BytesRange]
+        rootHash: KeccakHash
+
+    const
+      listLength = 30
+    var
+      memdb = newMemoryDB()
+      nonPruningTrie = initHexaryTrie(memdb, false)
+      keys = randList(BytesRange, randGen(5, 77), randGen(listLength))
+      values = randList(BytesRange, randGen(1, 57), randGen(listLength))
+      historyList = newSeq[History](listLength)
+
+    for i, k in keys:
+      historyList[i].keys = newSeq[BytesRange](i + 1)
+      historyList[i].values = newSeq[BytesRange](i + 1)
+      for x in 0 ..< i + 1:
+        historyList[i].keys[x] = keys[x]
+        historyList[i].values[x] = values[x]
+      nonPruningTrie.put(keys[i], values[i])
+      historyList[i].rootHash = nonPruningTrie.rootHash
+      historyList[i].keys.sort(cmp)
+      historyList[i].values.sort(cmp)
+
+    for h in historyList:
+      var
+        trie = initHexaryTrie(memdb, h.rootHash)
+        pKeys = trie.getKeys()
+        pValues = trie.getValues()
+      pKeys.sort(cmp)
+      pValues.sort(cmp)
+      check pKeys.len == h.keys.len
+      check pValues.len == h.values.len
+      check pKeys == h.keys
+      check pValues == h.values
