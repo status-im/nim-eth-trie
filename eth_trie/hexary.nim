@@ -314,7 +314,7 @@ proc getBranch*(self: HexaryTrie; key: BytesRange): seq[BytesRange] =
   getBranchAux(self.db, node, initNibbleRange(key), result)
 
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
-  if data.len >= 32: t.db.del(data.keccak.data)
+  if data.len >= 32: t.prune(data.keccak.data)
 
 proc dbPut(db: DB, data: BytesRange): TrieNodeKey =
   result.hash = data.keccak
@@ -504,7 +504,7 @@ proc del*(self: var HexaryTrie; key: BytesRange) =
   var newRootBytes = self.deleteAt(rootRlp, initNibbleRange(key))
   if newRootBytes.len > 0:
     if rootBytes.len < 32:
-      self.db.del(self.root.asDbKey)
+      self.prune(self.root.asDbKey)
     self.root = self.db.dbPut(newRootBytes)
 
 proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
@@ -531,7 +531,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
              key: NibblesRange, value: BytesRange,
              isInline = false): BytesRange =
   template origWithNewValue: auto =
-    self.db.del(origHash.data)
+    self.prune(origHash.data)
     replaceValue(orig, key, value).toRange
 
   if orig.isEmpty:
@@ -596,7 +596,7 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
       return origWithNewValue()
 
     if isInline:
-      self.db.del(origHash.data)
+      self.prune(origHash.data)
 
     let n = key[0]
     var i = 0
