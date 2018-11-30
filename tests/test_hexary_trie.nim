@@ -313,3 +313,51 @@ suite "hexary trie":
       if not ok:
         echo "ITERATION: ", iteration
         break
+
+  proc isValidBranch(branch: seq[BytesRange], rootHash: KeccakHash, key, value: BytesRange): bool =
+    # branch must not be empty
+    assert(branch.len != 0)
+
+    var db = newMemoryDB()
+    for node in branch:
+      assert(node.len != 0)
+      let nodeHash = hexary.keccak(node)
+      db.put(nodeHash.data, node.toOpenArray)
+
+    var trie = initHexaryTrie(db, rootHash)
+    result = trie.get(key) == toRange(value)
+
+  test "get branch with pruning trie":
+    var
+      memdb = newMemoryDB()
+      trie = initHexaryTrie(memdb)
+      keys = randList(BytesRange, randGen(5, 77), randGen(30))
+      vals = randList(BytesRange, randGen(1, 57), randGen(30))
+
+    for i in 0 ..< keys.len:
+      trie.put(keys[i], vals[i])
+
+    for i in 0 ..< keys.len:
+      var branch = trie.getBranch(keys[i])
+      check isValidBranch(branch, trie.rootHash, keys[i], vals[i])
+
+  test "get branch with non pruning trie":
+    const
+      numKeyVal = 30
+
+    var
+      memdb = newMemoryDB()
+      nonPruningTrie = initHexaryTrie(memdb, false)
+      keys = randList(BytesRange, randGen(5, 77), randGen(numKeyVal))
+      vals = randList(BytesRange, randGen(1, 57), randGen(numKeyVal))
+      roots = newSeq[KeccakHash](numKeyVal)
+
+    for i in 0 ..< keys.len:
+      nonPruningTrie.put(keys[i], vals[i])
+      roots[i] = nonPruningTrie.rootHash
+
+    for i in 0 ..< keys.len:
+      var trie = initHexaryTrie(memdb, roots[i], false)
+      for x in 0 ..< i+1:
+        var branch = trie.getBranch(keys[x])
+        check isValidBranch(branch, trie.rootHash, keys[x], vals[x])
