@@ -278,6 +278,41 @@ proc getKeys*(self: HexaryTrie): seq[BytesRange] =
   for k in self.keys:
     result.add k
 
+template getNode(elem: untyped): untyped =
+  if elem.isList: elem.rawData
+  else: get(db, toOpenArray(elem.expectHash)).toRange
+
+proc getBranchAux(db: DB, node: BytesRange, path: NibblesRange, output: var seq[BytesRange]) =
+  var nodeRlp = rlpFromBytes node
+  if not nodeRlp.hasData or nodeRlp.isEmpty: return
+
+  case nodeRlp.listLen
+  of 2:
+    let (isLeaf, k) = nodeRlp.extensionNodeKey
+    let sharedNibbles = sharedPrefixLen(path, k)
+    if sharedNibbles == k.len:
+      let value = nodeRlp.listElem(1)
+      if not isLeaf:
+        let nextLookup = value.getNode
+        output.add nextLookup
+        getBranchAux(db, nextLookup, path.slice(sharedNibbles), output)
+  of 17:
+    if path.len != 0:
+      var branch = nodeRlp.listElem(path[0].int)
+      if not branch.isEmpty:
+        let nextLookup = branch.getNode
+        output.add nextLookup
+        getBranchAux(db, nextLookup, path.slice(1), output)
+  else:
+    raise newException(CorruptedTrieError,
+                       "HexaryTrie node with an unexpected number of children")
+
+proc getBranch*(self: HexaryTrie; key: BytesRange): seq[BytesRange] =
+  result = @[]
+  var node = keyToLocalBytes(self.db, self.root)
+  result.add node
+  getBranchAux(self.db, node, initNibbleRange(key), result)
+
 proc dbDel(t: var HexaryTrie, data: BytesRange) =
   if data.len >= 32: t.db.del(data.keccak.data)
 
