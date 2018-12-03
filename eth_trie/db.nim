@@ -110,13 +110,20 @@ proc newMemoryDB*: TrieDatabaseRef =
   discard result.beginTransaction
   put(result, emptyRlpHash.data, emptyRlp)
 
-proc totalRecordsInMemoryDB*(db: TrieDatabaseRef): int =
+template isMemoryDB(db: TrieDatabaseRef): bool =
   # Make sure this is really a MemoryDB
-  assert db.obj == nil and
-         db.mostInnerTransaction != nil and
-         db.mostInnerTransaction.parentTransaction == nil
+  db.obj == nil and
+    db.mostInnerTransaction != nil and
+    db.mostInnerTransaction.parentTransaction == nil
 
+proc totalRecordsInMemoryDB*(db: TrieDatabaseRef): int =
+  assert isMemoryDB(db)
   return db.mostInnerTransaction.modifications.records.len
+
+iterator pairsInMemoryDB*(db: TrieDatabaseRef): (Bytes, Bytes) =
+  assert isMemoryDB(db)
+  for k, v in db.mostInnerTransaction.modifications.records:
+    yield (k, v.value)
 
 proc beginTransaction*(db: TrieDatabaseRef): DbTransaction =
   new result
