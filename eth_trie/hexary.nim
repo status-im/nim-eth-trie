@@ -74,6 +74,9 @@ proc rootHashHex*(t: HexaryTrie): string =
 template prune(t: HexaryTrie, x: openArray[byte]) =
   if t.isPruning: t.db.del(x)
 
+proc isPruning*(t: HexaryTrie): bool =
+  t.isPruning
+
 proc getLocalBytes(x: TrieNodeKey): BytesRange =
   ## This proc should be used on nodes using the optimization
   ## of short values within the key.
@@ -639,6 +642,7 @@ proc del*(self: var SecureHexaryTrie; key: BytesRange) =
 
 proc rootHash*(self: SecureHexaryTrie): KeccakHash {.borrow.}
 proc rootHashHex*(self: SecureHexaryTrie): string {.borrow.}
+proc isPruning*(self: SecureHexaryTrie): bool {.borrow.}
 
 template contains*(self: HexaryTrie | SecureHexaryTrie;
                    key: BytesRange): bool =

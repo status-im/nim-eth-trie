@@ -361,3 +361,16 @@ suite "hexary trie":
       for x in 0 ..< i+1:
         var branch = trie.getBranch(keys[x])
         check isValidBranch(branch, trie.rootHash, keys[x], vals[x])
+
+  test "isPruning getter":
+    var
+      memdb = newMemoryDB()
+      nonPruningTrie = initHexaryTrie(memdb, false)
+      pruningTrie = initHexaryTrie(memdb, true)
+      nonPruningSecureTrie = initSecureHexaryTrie(memdb, false)
+      pruningSecureTrie = initSecureHexaryTrie(memdb, true)
+
+    check nonPruningTrie.isPruning == false
+    check pruningTrie.isPruning == true
+    check nonPruningSecureTRie.isPruning == false
+    check pruningSecureTRie.isPruning == true
