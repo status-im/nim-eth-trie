@@ -75,8 +75,6 @@ proc parseNode*(node: BytesRange): TrieNode =
       raise newException(InvalidNode, "Invalid leaf node, can not contain empty value")
     # Output: node type, value
     return TrieNode(kind: LEAF_TYPE, value: node[1..^1])
-  else:
-    raise newException(InvalidNode, "Unable to parse node")
 
 proc encodeKVNode*(keyPath: TrieBitRange, childHash: TrieNodeKey): Bytes =
   ## Serializes a key/value node
