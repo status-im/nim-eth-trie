@@ -65,6 +65,9 @@ proc initHexaryTrie*(db: DB, isPruning = true): HexaryTrie =
   result.root = result.db.dbPut(emptyRlp.toRange)
   result.isPruning = isPruning
 
+template initSecureHexaryTrie*(db: DB, isPruning = true): SecureHexaryTrie =
+  SecureHexaryTrie initHexaryTrie(db, isPruning)
+
 proc rootHash*(t: HexaryTrie): KeccakHash =
   t.root.hash
 
