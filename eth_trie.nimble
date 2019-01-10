@@ -10,7 +10,8 @@ skipDirs      = @["tests"]
 requires "nim >= 0.18.1",
          "rlp",
          "nimcrypto",
-         "ranges"
+         "ranges",
+         "rocksdb"
 
 task test, "test debug mode":
   --hints: off
