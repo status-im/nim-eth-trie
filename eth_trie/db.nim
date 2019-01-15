@@ -21,10 +21,10 @@ type
     contains(DB, KeccakHash) is bool
 
   # XXX: poor's man vtref types
-  PutProc = proc (db: RootRef, key, val: openarray[byte])
-  GetProc = proc (db: RootRef, key: openarray[byte]): Bytes # Must return empty seq if not found
-  DelProc = proc (db: RootRef, key: openarray[byte])
-  ContainsProc = proc (db: RootRef, key: openarray[byte]): bool
+  PutProc = proc (db: RootRef, key, val: openarray[byte]) {.gcsafe.}
+  GetProc = proc (db: RootRef, key: openarray[byte]): Bytes {.gcsafe.} # Must return empty seq if not found
+  DelProc = proc (db: RootRef, key: openarray[byte]) {.gcsafe.}
+  ContainsProc = proc (db: RootRef, key: openarray[byte]): bool {.gcsafe.}
 
   TrieDatabaseRef* = ref object
     obj: RootRef
@@ -40,10 +40,10 @@ type
     modifications: MemoryLayer
     committed: bool
 
-proc put*(db: TrieDatabaseRef, key, val: openarray[byte])
-proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes
-proc del*(db: TrieDatabaseRef, key: openarray[byte])
-proc beginTransaction*(db: TrieDatabaseRef): DbTransaction
+proc put*(db: TrieDatabaseRef, key, val: openarray[byte]) {.gcsafe.}
+proc get*(db: TrieDatabaseRef, key: openarray[byte]): Bytes {.gcsafe.}
+proc del*(db: TrieDatabaseRef, key: openarray[byte]) {.gcsafe.}
+proc beginTransaction*(db: TrieDatabaseRef): DbTransaction {.gcsafe.}
 
 proc keccak*(r: BytesRange): KeccakHash =
   keccak256.digest r.toOpenArray
