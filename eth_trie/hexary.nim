@@ -56,14 +56,9 @@ proc initHexaryTrie*(db: DB, rootHash: KeccakHash, isPruning = true): HexaryTrie
 template initSecureHexaryTrie*(db: DB, rootHash: KeccakHash, isPruning = true): SecureHexaryTrie =
   SecureHexaryTrie initHexaryTrie(db, rootHash, isPruning)
 
-let
-  # XXX: turning this into a constant leads to a compilation failure
-  emptyRlp = rlp.encode ""
-
 proc initHexaryTrie*(db: DB, isPruning = true): HexaryTrie =
   result.db = db
-  {.gcsafe.}:
-    result.root = result.db.dbPut(emptyRlp.toRange)
+  result.root = result.db.dbPut(emptyRlp.toRange)
   result.isPruning = isPruning
 
 template initSecureHexaryTrie*(db: DB, isPruning = true): SecureHexaryTrie =
@@ -448,8 +443,7 @@ proc deleteAt(self: var HexaryTrie;
     let (isLeaf, k) = origRlp.extensionNodeKey
     if k == key and isLeaf:
       self.dbDel origBytes
-      {.gcsafe.}:
-        return emptyRlp.toRange
+      return emptyRlp.toRange
 
     if key.startsWith(k):
       var
