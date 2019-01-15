@@ -62,7 +62,8 @@ let
 
 proc initHexaryTrie*(db: DB, isPruning = true): HexaryTrie =
   result.db = db
-  result.root = result.db.dbPut(emptyRlp.toRange)
+  {.gcsafe.}:
+    result.root = result.db.dbPut(emptyRlp.toRange)
   result.isPruning = isPruning
 
 template initSecureHexaryTrie*(db: DB, isPruning = true): SecureHexaryTrie =
@@ -99,7 +100,7 @@ template keyToLocalBytes(db: DB, k: TrieNodeKey): BytesRange =
 template extensionNodeKey(r: Rlp): auto =
   hexPrefixDecode r.listElem(0).toBytes
 
-proc getAux(db: DB, nodeRlp: Rlp, path: NibblesRange): BytesRange
+proc getAux(db: DB, nodeRlp: Rlp, path: NibblesRange): BytesRange {.gcsafe.}
 
 proc getAuxByHash(db: DB, node: TrieNodeKey, path: NibblesRange): BytesRange =
   var nodeRlp = rlpFromBytes keyToLocalBytes(db, node)
@@ -384,7 +385,7 @@ proc findSingleChild(r: Rlp; childPos: var byte): Rlp =
         return zeroBytesRlp
     inc i
 
-proc deleteAt(self: var HexaryTrie; origRlp: Rlp, key: NibblesRange): BytesRange
+proc deleteAt(self: var HexaryTrie; origRlp: Rlp, key: NibblesRange): BytesRange {.gcsafe.}
 
 proc deleteAux(self: var HexaryTrie; rlpWriter: var RlpWriter;
                origRlp: Rlp; path: NibblesRange): bool =
@@ -447,7 +448,8 @@ proc deleteAt(self: var HexaryTrie;
     let (isLeaf, k) = origRlp.extensionNodeKey
     if k == key and isLeaf:
       self.dbDel origBytes
-      return emptyRlp.toRange
+      {.gcsafe.}:
+        return emptyRlp.toRange
 
     if key.startsWith(k):
       var
@@ -515,7 +517,7 @@ proc del*(self: var HexaryTrie; key: BytesRange) =
 
 proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
              key: NibblesRange, value: BytesRange,
-             isInline = false): BytesRange
+             isInline = false): BytesRange {.gcsafe.}
 
 proc mergeAt(self: var HexaryTrie, rlp: Rlp,
              key: NibblesRange, value: BytesRange,
