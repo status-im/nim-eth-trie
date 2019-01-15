@@ -39,7 +39,7 @@ proc expectHash(r: Rlp): BytesRange =
     raise newException(RlpTypeMismatch,
       "RLP expected to be a Keccak hash value, but has an incorrect length")
 
-proc dbPut(db: DB, data: BytesRange): TrieNodeKey
+proc dbPut(db: DB, data: BytesRange): TrieNodeKey {.gcsafe.}
 
 template get(db: DB, key: Rlp): BytesRange =
   db.get(key.expectHash.toOpenArray).toRange
