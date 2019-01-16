@@ -1,9 +1,9 @@
 import os, ranges, eth_trie/[defs, db_tracing]
-import ../storage_types
+import backend_defs
 
 when defined(windows):
   const Lib = "lmdb.dll"
-elif defined(macos):
+elif defined(macosx):
   const Lib = "liblmdb.dylib"
 else:
   const Lib = "liblmdb.so"
@@ -11,7 +11,11 @@ else:
 const
   MDB_NOSUBDIR = 0x4000
   MDB_NOTFOUND = -30798
-  LMDB_MAP_SIZE = 1024 * 1024 * 1024 * 10  # 10TB enough?
+
+when defined(cpu64):
+  const LMDB_MAP_SIZE = 1024'u64 * 1024'u64 * 1024'u64 * 10'u64  # 10TB enough?
+else:
+  const LMDB_MAP_SIZE = 1024'u64 * 1024'u64 * 1024'u64 # 32bit limitation
 
 type
   MDB_Env = distinct pointer
@@ -154,7 +158,7 @@ proc newChainDB*(basePath: string): ChainDB =
   if not ok: raiseStorageInitError()
 
   # file mode ignored on windows
-  ok = mdb_env_open(result.env, dataDir, MDB_NOSUBDIR, 0o664) == 0
+  ok = mdb_env_open(result.env, dataDir, MDB_NOSUBDIR.cuint, 0o664.cint) == 0
   if not ok: raiseStorageInitError()
 
   result.put(emptyRlpHash.data, emptyRlp)
