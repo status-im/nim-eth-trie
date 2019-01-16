@@ -1,9 +1,6 @@
 import
   unittest, macros, os,
-  # nimcrypto/[keccak, hash], ranges, eth_common/eth_types,
-  # ../nimbus/db/[storage_types],
-  #../nimbus/db/backends/[sqlite_backend, rocksdb_backend]
-  eth_trie/backends/[rocksdb_backend, sqlite_backend]
+  eth_trie/backends/[rocksdb_backend, sqlite_backend, lmdb_backend]
 
 template dummyInstance(T: type SqliteChainDB): auto =
   sqlite_backend.newChainDB(getTempDir(), inMemory = true)
@@ -12,6 +9,12 @@ template dummyInstance(T: type RocksChainDB): auto =
   let tmp = getTempDir() / "nimbus-test-db"
   removeDir(tmp)
   rocksdb_backend.newChainDB(tmp)
+
+template dummyInstance(T: type LmdbChainDB): auto =
+  # remove sqlite created database
+  let tmp = getTempDir() / "nimbus.db"
+  removeFile(tmp)
+  lmdb_backend.newChainDB(getTempDir())
 
 template backendTests(DB) =
   suite("storage tests: " & astToStr(DB)):
@@ -57,4 +60,4 @@ template backendTests(DB) =
 
 backendTests(RocksChainDB)
 backendTests(SqliteChainDB)
-
+backendTests(LmdbChainDB)

@@ -47,7 +47,7 @@ install:
   # Unpack mingw
   - IF NOT EXIST "%MINGW_ARCHIVE%" appveyor DownloadFile "%MINGW_URL%" -FileName "%MINGW_ARCHIVE%"
   - 7z x -y "%MINGW_ARCHIVE%" > nul
- 
+
   # Unpack sqlite
   - IF not exist "%SQLITE_ARCHIVE%" appveyor DownloadFile "%SQLITE_URL%" -FileName "%SQLITE_ARCHIVE%"
   - 7z x -y "%SQLITE_ARCHIVE%" > nul
@@ -57,6 +57,19 @@ install:
   - IF not exist "%ROCKSDB_ARCHIVE%" appveyor DownloadFile "%ROCKSDB_URL%" -FileName "%ROCKSDB_ARCHIVE%"
   - 7z x -y "%ROCKSDB_ARCHIVE%" > nul
   - IF "%PLATFORM%" == "x64" ( copy %CD%\x64\librocksdb.dll %CD%\bin\librocksdb.dll ) ELSE ( copy %CD%\x86\librocksdb.dll %CD%\bin\librocksdb.dll )
+
+  # download and build lmdb
+  - SET "LMDB_URL=https://github.com/LMDB/lmdb/archive"
+  - SET "LMDB_VER=0.9.22"
+  - SET "LMDB_ARCHIVE=LMDB_%LMDB_VER%.tar.gz"
+  - SET "LMDB_PATH=lmdb-LMDB_%LMDB_VER%\libraries\liblmdb"
+  - appveyor DownloadFile "%LMDB_URL%\%LMDB_ARCHIVE%" - FileName "%LMDB_ARCHIVE%"
+  - tar xvf %LMDB_ARCHIVE%
+  - cd %LMDB_PATH%
+  - gcc -shared -o lmdb.dll mdb.c midl.c -lntdll
+  - cd ..\..\..
+  - copy %LMDB_PATH%\lmdb.dll %CD%\bin\lmdb.dll
+
 
   # build nim from our own branch - this to avoid the day-to-day churn and
   # regressions of the fast-paced Nim development while maintaining the
