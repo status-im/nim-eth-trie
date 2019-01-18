@@ -54,11 +54,11 @@ install:
 
   # no need to cache, lmdb is small and compile very fast
   - "export LMDBVER=0.9.22"
-  - "rm -rf lmdb ; mkdir -p lmdb ; cd lmdb ; wget https://github.com/LMDB/lmdb/archive/LMDB_$LMDBVER.tar.gz && tar xvf LMDB_$LMDBVER.tar.gz; cd ..;"
-  - cd lmdb/lmdb-LMDB_$LMDBVER/libraries/liblmdb && make
+  - "wget https://github.com/LMDB/lmdb/archive/LMDB_$LMDBVER.tar.gz && tar xvf LMDB_$LMDBVER.tar.gz;"
+  - cd lmdb-LMDB_$LMDBVER/libraries/liblmdb && make
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sed -i 's| liblmdb.a||' Makefile && sudo make prefix=/usr install; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo cp liblmdb.so /usr/local/lib/liblmdb.dylib; fi
-  - cd ../../../..
+  - cd ../../..
 
 script:
   - nimble install -y
