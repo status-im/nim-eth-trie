@@ -1,4 +1,7 @@
 # nim-trie
+
+# MOVED TO https://github.com/status-im/nim-eth
+
 Nim Implementation of the Ethereum Trie structure
 ---
 
