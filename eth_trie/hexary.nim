@@ -516,7 +516,13 @@ proc mergeAt(self: var HexaryTrie, orig: Rlp, origHash: KeccakHash,
 proc mergeAt(self: var HexaryTrie, rlp: Rlp,
              key: NibblesRange, value: BytesRange,
              isInline = false): BytesRange =
-  self.mergeAt(rlp, rlp.rawData.keccak, key, value, isInline)
+  if rlp.isEmpty:
+    # we cannot get the rawData() of an empty RLP, so this case won't reach the
+    # coresponding check in that other mergeAt() variant that takes a RLP hash
+    # as an argument
+    replaceValue(rlp, key, value).toRange
+  else:
+    self.mergeAt(rlp, rlp.rawData.keccak, key, value, isInline)
 
 proc mergeAtAux(self: var HexaryTrie, output: var RlpWriter, orig: Rlp,
                 key: NibblesRange, value: BytesRange) =
